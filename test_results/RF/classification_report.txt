@@ -1,0 +1,11 @@
+Model: RF
+Accuracy: 0.8703
+
+              precision    recall  f1-score   support
+
+    phishing       0.89      0.81      0.85     13420
+  legitimate       0.86      0.92      0.89     16580
+
+    accuracy                           0.87     30000
+   macro avg       0.87      0.86      0.87     30000
+weighted avg       0.87      0.87      0.87     30000

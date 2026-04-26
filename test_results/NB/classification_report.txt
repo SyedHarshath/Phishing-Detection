@@ -1,0 +1,11 @@
+Model: NB
+Accuracy: 0.6028
+
+              precision    recall  f1-score   support
+
+    phishing       0.68      0.21      0.32     13420
+  legitimate       0.59      0.92      0.72     16580
+
+    accuracy                           0.60     30000
+   macro avg       0.63      0.57      0.52     30000
+weighted avg       0.63      0.60      0.54     30000

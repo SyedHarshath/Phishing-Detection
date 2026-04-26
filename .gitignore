@@ -1,0 +1,47 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Virtual Environments
+# =========================
+.env
+.venv
+env/
+venv/
+dephides_env/
+
+# =========================
+# IDE
+# =========================
+.idea/
+.vscode/
+.DS_Store
+
+# =========================
+# Dataset (too large for GitHub)
+# =========================
+dataset/big_dataset/
+
+# =========================
+# Trained models (Over 100MB GitHub limit)
+# =========================
+*.h5
+*.pb
+*.ckpt
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Massive ML Models
+# =========================
+test_results/RF/model.pkl
+test_results/NB/model.pkl
+test_results/SVM/model.pkl
