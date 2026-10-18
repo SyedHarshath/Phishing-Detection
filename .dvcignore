@@ -1,0 +1,9 @@
+# Local/runtime artifacts
+mlruns/
+mlops/data/
+__pycache__/
+*.pyc
+*.log
+
+# Large generated ML artifacts that should be versioned separately if desired
+test_results/

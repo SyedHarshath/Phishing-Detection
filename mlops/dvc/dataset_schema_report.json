@@ -1,0 +1,225 @@
+{
+  "parser": "binary-tab-loader-v1",
+  "dataset_directory": "D:\\Workspace\\DEPHIDES\\Phishing Detection\\Phishing Detection\\dataset\\big_dataset",
+  "schema": {
+    "record_layout": "tab-delimited text in parseable splits",
+    "fixed_width": false,
+    "record_format": "UTF-8 text, one record per line",
+    "field_delimiter": "tab",
+    "field_order": [
+      "label",
+      "url"
+    ],
+    "header_present": false,
+    "labels": {
+      "phishing": 0,
+      "legitimate": 1
+    },
+    "record_terminator": "LF or CRLF"
+  },
+  "splits": {
+    "train": {
+      "size_bytes": 326952092,
+      "detected_type": "UTF-8 delimited text candidate",
+      "encoding": "UTF-8",
+      "compression_or_container": null,
+      "prefix_hex": "6c 65 67 69 74 69 6d 61 74 65 09 68 74 74 70 73 3a 2f 2f 6a 61 6d 61 70 75 6e 6a 69 2e 70 6b 2f 6e 65 77 73 2f 73 65 63 70 2d 63 6f 6e 64 75 63 74 73 2d 69 6e 74 65 72 61 63 74 69 76 65 2d 73",
+      "prefix_repr": "b'legitimate\\thttps://jamapunji.pk/news/secp-conducts-interactive-s'",
+      "nul_byte_count": 0,
+      "nul_byte_ratio": 0.0,
+      "tab_byte_count": 3641989,
+      "line_feed_byte_count": 3641986,
+      "carriage_return_byte_count": 0,
+      "utf8_prefix_decodes": true,
+      "schema": {
+        "record_layout": "tab-delimited",
+        "fixed_width": false,
+        "record_delimiter": "line feed (LF or CRLF)",
+        "field_delimiter": "tab",
+        "field_order": [
+          "label",
+          "url"
+        ],
+        "header_present": false,
+        "label_encoding": {
+          "phishing": 0,
+          "legitimate": 1
+        }
+      },
+      "record_count": 3641986,
+      "record_count_estimate": 3641986,
+      "record_count_estimate_note": "Counted from non-empty text lines.",
+      "parsed_record_count": 3641984,
+      "malformed_record_count": 2,
+      "overlong_record_count": 0,
+      "record_terminators": {
+        "line_feed_bytes": 3641986,
+        "carriage_return_bytes": 0
+      },
+      "label_counts": {
+        "legitimate": 2017363,
+        "phishing": 1624621
+      },
+      "sample_records": [
+        {
+          "label": "legitimate",
+          "url": "https://jamapunji.pk/news/secp-conducts-interactive-session-iba-karachi"
+        },
+        {
+          "label": "legitimate",
+          "url": "https://www.havochvatten.se/hav/vagledning--lagar/anslag-och-bidrag/vattenpriset-sjostjarnan/vasterviks-kommun-vinnare-av-vattenpriset-sjostjarnan-2017.html"
+        },
+        {
+          "label": "legitimate",
+          "url": "http://www.folkhalsomyndigheten.se/smittskydd-beredskap/vaccinationer/fragor-och-svar/rotavirus-old/fragor-och-svar-om-rotavirus/mitt-barn-har-haft-rotavirusinfektion.-ar-det-skyddat-mot-sjukdomen-nu/"
+        },
+        {
+          "label": "phishing",
+          "url": "http://steamcommunitty.16mb.com/"
+        },
+        {
+          "label": "phishing",
+          "url": "http://webmail-aol.help-bya-iso.webapps-security.review-2jk39w92.carsonlind.com/%23$%25$%23$%23%25$%23%23@$@@$$/"
+        }
+      ],
+      "parsing_status": "valid_with_malformed_records",
+      "parsing_confidence": "high"
+    },
+    "val": {
+      "size_bytes": 94967444,
+      "detected_type": "UTF-8 delimited text candidate",
+      "encoding": "UTF-8",
+      "compression_or_container": null,
+      "prefix_hex": "70 68 69 73 68 69 6e 67 09 68 74 74 70 3a 2f 2f 73 69 67 6e 69 6e 2e 65 62 61 79 2e 66 72 2e 75 73 65 72 69 64 39 38 37 6d 63 33 38 73 2e 62 65 72 77 61 72 69 2e 6e 65 74 2f 2f 77 73 2f 65 42",
+      "prefix_repr": "b'phishing\\thttp://signin.ebay.fr.userid987mc38s.berwari.net//ws/eB'",
+      "nul_byte_count": 0,
+      "nul_byte_ratio": 0.0,
+      "tab_byte_count": 1045779,
+      "line_feed_byte_count": 1045774,
+      "carriage_return_byte_count": 1045774,
+      "utf8_prefix_decodes": true,
+      "schema": {
+        "record_layout": "tab-delimited",
+        "fixed_width": false,
+        "record_delimiter": "line feed (LF or CRLF)",
+        "field_delimiter": "tab",
+        "field_order": [
+          "label",
+          "url"
+        ],
+        "header_present": false,
+        "label_encoding": {
+          "phishing": 0,
+          "legitimate": 1
+        }
+      },
+      "record_count": 1045775,
+      "record_count_estimate": 1045775,
+      "record_count_estimate_note": "Counted from non-empty text lines.",
+      "parsed_record_count": 1045772,
+      "malformed_record_count": 3,
+      "overlong_record_count": 0,
+      "record_terminators": {
+        "line_feed_bytes": 1045774,
+        "carriage_return_bytes": 1045774
+      },
+      "label_counts": {
+        "phishing": 466501,
+        "legitimate": 579271
+      },
+      "sample_records": [
+        {
+          "label": "phishing",
+          "url": "http://signin.ebay.fr.userid987mc38s.berwari.net//ws/eBayISAPI.dll.SignIn/ebayfr.html"
+        },
+        {
+          "label": "phishing",
+          "url": "http://huskasitu.com/New directory/k9G5zscreenname.aol.com/"
+        },
+        {
+          "label": "legitimate",
+          "url": "http://pcweek.ru/themes/detail.php?id=48440"
+        },
+        {
+          "label": "phishing",
+          "url": "http://skksonline.com/wp-content/themes/securedfilefolder/file"
+        },
+        {
+          "label": "phishing",
+          "url": "http://bitly.com/dj_co_privacidad"
+        }
+      ],
+      "parsing_status": "valid_with_malformed_records",
+      "parsing_confidence": "high"
+    },
+    "test": {
+      "size_bytes": 46773408,
+      "detected_type": "UTF-8 delimited text candidate",
+      "encoding": "UTF-8",
+      "compression_or_container": null,
+      "prefix_hex": "70 68 69 73 68 69 6e 67 09 68 74 74 70 73 3a 2f 2f 62 6c 6f 63 6b 63 68 61 6f 69 6e 2e 69 6e 66 6f 2f 23 2f 0d 0a 6c 65 67 69 74 69 6d 61 74 65 09 68 74 74 70 73 3a 2f 2f 77 77 77 2e 69 6e 73",
+      "prefix_repr": "b'phishing\\thttps://blockchaoin.info/#/\\r\\nlegitimate\\thttps://www.ins'",
+      "nul_byte_count": 0,
+      "nul_byte_ratio": 0.0,
+      "tab_byte_count": 515080,
+      "line_feed_byte_count": 515079,
+      "carriage_return_byte_count": 515079,
+      "utf8_prefix_decodes": true,
+      "schema": {
+        "record_layout": "tab-delimited",
+        "fixed_width": false,
+        "record_delimiter": "line feed (LF or CRLF)",
+        "field_delimiter": "tab",
+        "field_order": [
+          "label",
+          "url"
+        ],
+        "header_present": false,
+        "label_encoding": {
+          "phishing": 0,
+          "legitimate": 1
+        }
+      },
+      "record_count": 515080,
+      "record_count_estimate": 515080,
+      "record_count_estimate_note": "Counted from non-empty text lines.",
+      "parsed_record_count": 515080,
+      "malformed_record_count": 0,
+      "overlong_record_count": 0,
+      "record_terminators": {
+        "line_feed_bytes": 515079,
+        "carriage_return_bytes": 515079
+      },
+      "label_counts": {
+        "phishing": 229766,
+        "legitimate": 285314
+      },
+      "sample_records": [
+        {
+          "label": "phishing",
+          "url": "https://blockchaoin.info/#/"
+        },
+        {
+          "label": "legitimate",
+          "url": "https://www.insects.org/ced4/crush_freaks.html"
+        },
+        {
+          "label": "legitimate",
+          "url": "https://www.elpasotimes.com/story/opinion/editorials/2015/11/17/editorial-terror-attack-brings-tough-choices/75960544/"
+        },
+        {
+          "label": "phishing",
+          "url": "http://direct-certs.bankofamerica.com.techdbaseurl46.cn/direct/certpickup.asp?session=5205817050667567602066511025245896499574920702005427213141662"
+        },
+        {
+          "label": "legitimate",
+          "url": "https://gotham-magazine.com/lalique-unveils-epis-ring"
+        }
+      ],
+      "parsing_status": "valid",
+      "parsing_confidence": "high"
+    }
+  },
+  "overall_status": "parseable",
+  "overall_parsing_confidence": "high"
+}

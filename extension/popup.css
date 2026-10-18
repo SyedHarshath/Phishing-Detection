@@ -1,0 +1,130 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  width: 360px;
+  min-height: 420px;
+  font-family: Arial, sans-serif;
+  background: #f7f8fa;
+  color: #202124;
+}
+
+.container {
+  padding: 18px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.header p {
+  margin: 5px 0 18px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.url-section label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+textarea {
+  width: 100%;
+  resize: none;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  font-size: 12px;
+  line-height: 1.4;
+  outline: none;
+}
+
+textarea:focus {
+  border-color: #6b7280;
+}
+
+.scan-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px;
+  border: 0;
+  border-radius: 8px;
+  background: #202124;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scan-button:hover {
+  opacity: 0.9;
+}
+
+.scan-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #fff4e5;
+  color: #8a4b08;
+  font-size: 12px;
+}
+
+.result {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: white;
+}
+
+.result-badge {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.result-badge.phishing {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.result-badge.legitimate {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0;
+  font-size: 13px;
+}
+
+.result-row span {
+  color: #6b7280;
+}
+
+footer {
+  margin-top: 18px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.hidden {
+  display: none;
+}

@@ -1,0 +1,10 @@
+{
+  "prediction_count": 58,
+  "phishing_count": 34,
+  "legitimate_count": 24,
+  "phishing_rate": 0.5862068965517241,
+  "average_confidence": 97.1091379310345,
+  "feedback_count": 1,
+  "feedback_accuracy": 0.0,
+  "average_url_length": 52.41379310344828
+}

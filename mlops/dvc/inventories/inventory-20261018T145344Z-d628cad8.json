@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "tool_version": "optimus-inventory-v1",
+  "mode": "fast",
+  "status": "completed",
+  "started_at_utc": "2026-10-18T14:53:44.107517+00:00",
+  "generated_at_utc": "2026-10-18T14:55:00.538733+00:00",
+  "source": "workspace-dataset",
+  "source_path": "D:\\Workspace\\DEPHIDES\\Phishing Detection\\Phishing Detection\\dataset\\big_dataset",
+  "provenance_status": "pointer_mismatch",
+  "files": [
+    {
+      "path": "meta.txt",
+      "size_bytes": 477,
+      "mtime_utc": "2026-10-12T05:22:30.955488+00:00",
+      "sha256": "a04374ed601f1e937c8d7e6b16faa945d65fd3e55cd961bed7f3f698d6dccb36",
+      "dvc_md5": "85f7bafc071e4d55772fb15a665c75b6",
+      "line_count": 13,
+      "parsed_record_count": 0,
+      "label_counts": {},
+      "empty_records": 3,
+      "malformed_records": 10,
+      "invalid_label_records": 0,
+      "missing_url_records": 0,
+      "overlong_records": 0,
+      "nul_bytes": 0,
+      "invalid_url_records": 0,
+      "elapsed_seconds": 0.0
+    },
+    {
+      "path": "tain_note.txt",
+      "size_bytes": 150,
+      "mtime_utc": "2026-10-12T05:22:31.086630+00:00",
+      "sha256": "75bd273ae6d23e0d6e33b1ae950866c5085068ab4764a5ae3585f81f6e4cecbd",
+      "dvc_md5": "6c987b312a813ee87e5653a2bbee6d6c",
+      "line_count": 1,
+      "parsed_record_count": 0,
+      "label_counts": {},
+      "empty_records": 0,
+      "malformed_records": 1,
+      "invalid_label_records": 0,
+      "missing_url_records": 0,
+      "overlong_records": 0,
+      "nul_bytes": 0,
+      "invalid_url_records": 0,
+      "elapsed_seconds": 0.0
+    },
+    {
+      "path": "test.txt",
+      "size_bytes": 46773408,
+      "mtime_utc": "2026-10-18T12:23:24.174217+00:00",
+      "sha256": "813b7da0209c0c2dc6f3082a62cb77db2699d1922959f5b707ae31f496c16f33",
+      "dvc_md5": "de1cc65eb8fc4f9b37ef6c41caf56eef",
+      "line_count": 515080,
+      "parsed_record_count": 515080,
+      "label_counts": {
+        "phishing": 229766,
+        "legitimate": 285314
+      },
+      "empty_records": 0,
+      "malformed_records": 0,
+      "invalid_label_records": 0,
+      "missing_url_records": 0,
+      "overlong_records": 0,
+      "nul_bytes": 0,
+      "invalid_url_records": 152,
+      "elapsed_seconds": 5.656
+    },
+    {
+      "path": "train.txt",
+      "size_bytes": 326952092,
+      "mtime_utc": "2026-10-12T05:23:18.160528+00:00",
+      "sha256": "2de358802c0a4102b047845aa2d61184f3c9a5ac25cdf134bb64e126bb410165",
+      "dvc_md5": "67bafdd2866c746c2250eb1bf831b255",
+      "line_count": 3641986,
+      "parsed_record_count": 3641984,
+      "label_counts": {
+        "legitimate": 2017363,
+        "phishing": 1624621
+      },
+      "empty_records": 0,
+      "malformed_records": 2,
+      "invalid_label_records": 0,
+      "missing_url_records": 0,
+      "overlong_records": 0,
+      "nul_bytes": 0,
+      "invalid_url_records": 1008,
+      "elapsed_seconds": 54.485
+    },
+    {
+      "path": "val.txt",
+      "size_bytes": 94967444,
+      "mtime_utc": "2026-10-18T12:23:36.376103+00:00",
+      "sha256": "793d466ea76a5e0344a3fb9937d8249296f9a02e7cc3d0b299666021686f0644",
+      "dvc_md5": "e6fcfe68f96e5cac3b5239e9233b02d8",
+      "line_count": 1045775,
+      "parsed_record_count": 1045772,
+      "label_counts": {
+        "phishing": 466501,
+        "legitimate": 579271
+      },
+      "empty_records": 0,
+      "malformed_records": 3,
+      "invalid_label_records": 0,
+      "missing_url_records": 0,
+      "overlong_records": 0,
+      "nul_bytes": 0,
+      "invalid_url_records": 287,
+      "elapsed_seconds": 16.281
+    }
+  ],
+  "pointer": {
+    "pointer_path": "dataset\\big_dataset.dvc",
+    "pointer_directory_md5": "6e5cc66e19ab49115a2d14ac50f053f0.dir",
+    "pointer_size_bytes": 468693266,
+    "pointer_file_count": 4,
+    "cache_directory_object": ".dvc\\cache\\files\\md5\\6e\\5cc66e19ab49115a2d14ac50f053f0.dir",
+    "cache_directory_object_exists": true,
+    "pointer_entries": [
+      {
+        "path": "meta.txt",
+        "md5": "510e37fc73bc0922628d58383c190c76"
+      },
+      {
+        "path": "test.txt",
+        "md5": "d4cc3eaa7c29d55f69c434dee2edcfcd"
+      },
+      {
+        "path": "train.txt",
+        "md5": "a2158eb6382cf53fd48df8f748aecca3"
+      },
+      {
+        "path": "val.txt",
+        "md5": "aab56297fb065aef286618ab3e6f32b8"
+      }
+    ],
+    "inventory_source": "workspace"
+  },
+  "pointer_comparison": {
+    "pointer_file_set_matches": false,
+    "files_matching_pointer_md5": [],
+    "files_differing_from_pointer_md5": [
+      "meta.txt",
+      "test.txt",
+      "train.txt",
+      "val.txt"
+    ],
+    "untracked_local_files": [
+      "tain_note.txt"
+    ]
+  },
+  "full_validation": null,
+  "registrable_domain_overlap": {
+    "status": "unavailable",
+    "reason": "No pinned public-suffix-list data or PSL-aware dependency is installed."
+  },
+  "schema": {
+    "record_format": "UTF-8 line based label<TAB>URL",
+    "labels": {
+      "phishing": 0,
+      "legitimate": 1
+    }
+  },
+  "preprocessing_version": "url-character-lowercase-pad200-v1",
+  "limitations": [
+    "Fast mode does not perform duplicate or cross-split overlap indexing.",
+    "DVC hash agreement establishes a tracked snapshot, not original source or incumbent training history.",
+    "Registrable-domain overlap requires a pinned public suffix list, unavailable in this environment."
+  ],
+  "progress": {
+    "file": "val.txt",
+    "processed_records": 1000000,
+    "updated_at_utc": "2026-10-18T14:54:59.449372+00:00"
+  },
+  "inventory_fingerprint": "4c135b09dfed39690f4f9109ed5b5ad7953e81e3022b4e0e3edf397ac5682aa3",
+  "completed_at_utc": "2026-10-18T14:55:00.538733+00:00"
+}

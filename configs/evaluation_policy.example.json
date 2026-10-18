@@ -1,0 +1,16 @@
+{
+  "version": "application-policy-not-approved-v1",
+  "enabled": false,
+  "thresholds": {
+    "max_phishing_fnr": null,
+    "max_legitimate_fpr": null,
+    "min_phishing_recall": null,
+    "min_legitimate_recall": null,
+    "min_phishing_precision": null,
+    "min_legitimate_precision": null,
+    "max_phishing_fnr_regression": null,
+    "max_legitimate_fpr_regression": null,
+    "max_latency_ratio": null
+  },
+  "note": "Set enabled and validated numeric limits only after application risk review. These null values intentionally block evaluation."
+}

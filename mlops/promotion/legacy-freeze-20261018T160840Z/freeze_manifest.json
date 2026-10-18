@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "status": "frozen_snapshot",
+  "model_version": "legacy-incumbent-20261018T160840Z",
+  "freeze_timestamp_utc": "2026-10-18T16:08:40.134246+00:00",
+  "freeze_method": "read-only source copy with byte-for-byte SHA-256 verification",
+  "class_order": [
+    "phishing",
+    "legitimate"
+  ],
+  "label_mapping": {
+    "phishing": 0,
+    "legitimate": 1
+  },
+  "preprocessing_version": "url-character-lowercase-pad200-v1",
+  "sequence_length": 200,
+  "historical_training_provenance": "unknown",
+  "checkpoint_selection_history": "unknown",
+  "training_data_reconstructed": false,
+  "files": {
+    "best_model.h5": {
+      "sha256": "f12c216a8e840cbf099288e7b2350acfd956d71dd2f0478da79ad97402558365",
+      "size_bytes": 4957960,
+      "source_path": "test_results/cnn_bilstm/best_model.h5"
+    },
+    "tokenizer.json": {
+      "sha256": "c2f3fa9724eda654478e1bc65ddae804f78f9bc85ce23f6711d315a1b91c4a1c",
+      "size_bytes": 5260,
+      "source_path": "ml/artifacts/tokenizer.json"
+    },
+    "preprocessing.py": {
+      "sha256": "48b71d863b3d3c5fe89bffe3aef15cdba98e9020d2396ff47b949c6e6c2a425e",
+      "size_bytes": 488,
+      "source_path": "ml/preprocessing.py"
+    },
+    "prediction.py": {
+      "sha256": "22a8bb4cd059419aadbc3807a74604ce0ac472e2e878a94c4cbc6e52e889f8f2",
+      "size_bytes": 4500,
+      "source_path": "ml/prediction.py"
+    }
+  },
+  "limitations": [
+    "This freeze establishes the bytes and inference code at freeze time only.",
+    "It does not reconstruct the incumbent training dataset, training run, or checkpoint selection history."
+  ]
+}

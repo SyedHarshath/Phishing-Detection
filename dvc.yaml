@@ -1,0 +1,48 @@
+stages:
+  validate:
+    cmd: python -m mlops.dvc.inspect_dataset
+    deps:
+      - dataset/big_dataset
+      - mlops/dvc/inspect_dataset.py
+    outs:
+      - mlops/dvc/dataset_schema_report.json
+
+  smoke_train_candidate:
+    cmd: >-
+      python -m src.train_smoke
+      --train-samples 4000
+      --val-samples 500
+      --test-samples 500
+      --epochs 1
+      --batch-size 64
+      --seed 42
+    deps:
+      - dataset/big_dataset
+      - mlops/dvc/dataset_schema_report.json
+      - mlops/dvc/inspect_dataset.py
+      - src/data_loader.py
+      - src/dl_models.py
+      - src/train_smoke.py
+    outs:
+      - artifacts/candidate_cnn_bilstm
+
+  evaluate_smoke_candidate:
+    cmd: python -m src.evaluate_smoke
+    deps:
+      - dataset/big_dataset/test.txt
+      - artifacts/candidate_cnn_bilstm/best_model.h5
+      - artifacts/candidate_cnn_bilstm/tokenizer.json
+      - artifacts/candidate_cnn_bilstm/metrics.json
+      - artifacts/candidate_cnn_bilstm/smoke_test_report.json
+      - src/data_loader.py
+      - src/evaluate_smoke.py
+      - src/train_smoke.py
+
+  monitor:
+    cmd: python -m mlops.monitoring.monitor
+    deps:
+      - backend/app/database.py
+      - mlops/monitoring/monitor.py
+      - mlops/mlflow_config.py
+    outs:
+      - mlops/monitoring/monitoring_run.json

@@ -14,6 +14,7 @@ __pycache__/
 env/
 venv/
 dephides_env/
+mlflow_venv/
 
 # =========================
 # IDE
@@ -33,6 +34,11 @@ dataset/big_dataset/
 *.h5
 *.pb
 *.ckpt
+artifacts/
+mlartifacts/
+mlruns/
+mlflow.db
+mlops/data/*.db
 
 # =========================
 # Logs

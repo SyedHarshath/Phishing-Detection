@@ -9,12 +9,11 @@ warnings.filterwarnings("ignore")
 
 import streamlit as st
 import numpy as np
-import pickle
 import time
 from urllib.parse import urlparse
 
 import tensorflow as tf
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+from ml.prediction import PhishingPredictor
 import absl.logging
 
 absl.logging.set_verbosity(absl.logging.ERROR) 
@@ -120,12 +119,11 @@ st.markdown("""
 
 @st.cache_resource(show_spinner="Loading CNN+BiLSTM Architecture...")
 def load_system():
-    model = tf.keras.models.load_model(r'D:\dephides\test_results\cnn_bilstm\best_model.h5')
-    with open(r'D:\dephides\src\tokenizer.pkl', 'rb') as f:
-        tokenizer = pickle.load(f)
-    return model, tokenizer
+    # Resolve the same versioned active bundle as FastAPI, once per Streamlit
+    # process. Promotion still requires a process restart to clear this cache.
+    return PhishingPredictor()
 
-model, tokenizer = load_system()
+predictor = load_system()
 
 st.markdown("### 🔍 Enter Target URL")
 url_input = st.text_input("URL", label_visibility="collapsed", placeholder="https://secure-login-update.com")
@@ -139,15 +137,9 @@ if st.button("🚀 INITIATE SCAN"):
             my_bar.progress(percent_complete + 1, text=progress_text)
         my_bar.empty()
         
-        if is_trusted_heuristic(url_input):
-            pred = 0.0  
-            confidence = 100.0
-        
-        else:
-            seq = tokenizer.texts_to_sequences([url_input])
-            padded = pad_sequences(seq, maxlen=200)
-            pred = model.predict(padded)[0][0]
-            confidence = (1 - pred if pred < 0.5 else pred) * 100
+        prediction = predictor.predict(url_input)
+        pred = 1.0 if prediction["prediction"] == "phishing" else 0.0
+        confidence = prediction["confidence"]
         
         st.markdown("---")
         st.markdown("### 📊 Scan Results")

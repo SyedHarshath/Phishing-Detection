@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OPTIMUS</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <main class="container">
+    <header class="header">
+      <div>
+        <h1>OPTIMUS</h1>
+        <p>AI-powered phishing detection</p>
+      </div>
+    </header>
+
+    <section class="url-section">
+      <label for="url">Current URL</label>
+      <textarea id="url" rows="3" spellcheck="false"></textarea>
+    </section>
+
+    <button id="scanButton" class="scan-button">Scan URL</button>
+
+    <div id="status" class="status hidden"></div>
+
+    <section id="result" class="result hidden">
+      <div id="resultBadge" class="result-badge"></div>
+
+      <div class="result-row">
+        <span>Confidence</span>
+        <strong id="confidence">-</strong>
+      </div>
+
+      <div class="result-row">
+        <span>Model version</span>
+        <strong id="modelVersion">-</strong>
+      </div>
+    </section>
+
+    <footer>
+      <span id="apiStatus">Checking API...</span>
+    </footer>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

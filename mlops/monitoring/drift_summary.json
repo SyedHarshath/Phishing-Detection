@@ -1,0 +1,28 @@
+{
+  "baseline_source": "mlops\\monitoring\\reference_data.csv",
+  "production_sample_count": 58,
+  "baseline_sample_count": 20,
+  "baseline_avg_url_length": 31.1,
+  "production_avg_url_length": 52.414,
+  "url_length_shift_ratio": 0.685331,
+  "baseline_phishing_rate": 0.5,
+  "production_phishing_rate": 0.586207,
+  "phishing_rate_shift": 0.086207,
+  "baseline_label_distribution": {
+    "legitimate": 0.5,
+    "phishing": 0.5
+  },
+  "production_label_distribution": {
+    "legitimate": 0.413793,
+    "phishing": 0.586207
+  },
+  "label_distribution_psi": 0.030026,
+  "average_confidence": 97.109,
+  "drift_detected": true,
+  "drift_thresholds": {
+    "distribution_psi": 0.25,
+    "url_length_shift": 0.15,
+    "phishing_rate_shift": 0.1
+  },
+  "generated_at_utc": "2026-09-28T05:32:54.594561+00:00"
+}

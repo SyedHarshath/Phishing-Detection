@@ -1,0 +1,17 @@
+# Starting parameters for a future reproducible training stage.
+# Keep this file in Git; do not put secrets here.
+
+model:
+  name: cnn_bilstm
+  sequence_length: 200
+  embedding_dim: 128
+
+training:
+  batch_size: 512
+  epochs: 30
+  learning_rate: 0.0003
+
+tokenizer:
+  char_level: true
+  lowercase: true
+  oov_token: "-n-"

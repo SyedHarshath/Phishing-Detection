@@ -1,0 +1,479 @@
+"""SQLite label governance, immutable batch export, and offline eligibility.
+
+User feedback is always unverified. Only an explicit reviewer decision can
+make a row eligible for training. This module never starts training.
+"""
+from __future__ import annotations
+
+import argparse
+from contextlib import contextmanager
+import hashlib
+import json
+import os
+import shutil
+import sqlite3
+import sys
+import tempfile
+import uuid
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DB = ROOT / "mlops" / "data" / "predictions.db"
+DEFAULT_BATCH_DIR = ROOT / "mlops" / "data" / "approved_batches"
+LABELS = {"phishing", "legitimate"}
+SCHEMA_VERSION = 1
+PREPROCESSING_VERSION = "url-character-lowercase-pad200-v1"
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+@contextmanager
+def connect(db_path: Path | str = DEFAULT_DB):
+    path = Path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=30, isolation_level="DEFERRED")
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA foreign_keys=ON")
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def initialize_schema(db_path: Path | str = DEFAULT_DB) -> None:
+    """Add fields/tables without dropping or rewriting prediction records."""
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(predictions)")}
+        if not columns:
+            raise RuntimeError("predictions table is missing; initialize the application DB first")
+        additions = {
+            "verification_status": "TEXT NOT NULL DEFAULT 'unlabeled'",
+            "label_provenance": "TEXT",
+            "verified_label": "TEXT",
+            "verified_by": "TEXT",
+            "verified_at": "TEXT",
+            "training_eligible": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for name, declaration in additions.items():
+            if name not in columns:
+                conn.execute(f"ALTER TABLE predictions ADD COLUMN {name} {declaration}")
+        statements = (
+            """CREATE TABLE IF NOT EXISTS feedback_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prediction_id INTEGER NOT NULL,
+                label TEXT NOT NULL CHECK(label IN ('phishing','legitimate')),
+                provenance TEXT NOT NULL,
+                received_at TEXT NOT NULL,
+                FOREIGN KEY(prediction_id) REFERENCES predictions(id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS label_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prediction_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                status TEXT NOT NULL,
+                label TEXT,
+                provenance TEXT,
+                reviewer TEXT,
+                reason TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(prediction_id) REFERENCES predictions(id)
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_predictions_training_eligible ON predictions(training_eligible, id)",
+            """CREATE TABLE IF NOT EXISTS training_batches (
+                batch_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                record_count INTEGER NOT NULL,
+                phishing_count INTEGER NOT NULL,
+                legitimate_count INTEGER NOT NULL,
+                fingerprint TEXT NOT NULL UNIQUE,
+                manifest_path TEXT NOT NULL,
+                schema_version INTEGER NOT NULL,
+                source_min_id INTEGER NOT NULL,
+                source_max_id INTEGER NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS training_batch_records (
+                prediction_id INTEGER PRIMARY KEY,
+                batch_id TEXT NOT NULL,
+                FOREIGN KEY(prediction_id) REFERENCES predictions(id),
+                FOREIGN KEY(batch_id) REFERENCES training_batches(batch_id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS retraining_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS retraining_jobs (
+                job_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                batch_id TEXT,
+                error TEXT
+            )""",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_retraining_job ON retraining_jobs(status) WHERE status IN ('eligible','running')",
+        )
+        for statement in statements:
+            conn.execute(statement)
+        # Existing user feedback is preserved and marked as a claim awaiting review.
+        conn.execute("""UPDATE predictions SET verification_status='pending_verification',
+                    label_provenance=COALESCE(label_provenance,'user_feedback')
+                    WHERE feedback IS NOT NULL AND verification_status='unlabeled'""")
+        conn.execute("""INSERT INTO label_audit
+            (prediction_id,action,status,label,provenance,reason,created_at)
+            SELECT p.id,'legacy_feedback_migrated','pending_verification',p.feedback,
+                   'user_feedback','Imported as an unverified historical claim',
+                   COALESCE(p.feedback_timestamp,p.timestamp)
+            FROM predictions p
+            WHERE p.feedback IS NOT NULL AND NOT EXISTS (
+                SELECT 1 FROM label_audit a WHERE a.prediction_id=p.id)""")
+        conn.execute("""INSERT INTO feedback_events(prediction_id,label,provenance,received_at)
+            SELECT p.id,p.feedback,'user_feedback',COALESCE(p.feedback_timestamp,p.timestamp)
+            FROM predictions p WHERE p.feedback IN ('phishing','legitimate')
+              AND NOT EXISTS (SELECT 1 FROM feedback_events f WHERE f.prediction_id=p.id)""")
+
+
+def require_schema(db_path: Path | str = DEFAULT_DB) -> None:
+    """Read-only precondition used by dry-run commands."""
+    path = Path(db_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Database not found: {path}; initialize the API database first")
+    conn = sqlite3.connect(f"file:{path.resolve().as_posix()}?mode=ro", uri=True)
+    try:
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        needed = {"predictions", "training_batch_records", "retraining_jobs", "retraining_state"}
+        if not needed.issubset(tables):
+            raise RuntimeError("MLOps schema is not initialized; run `python -m mlops.data.lifecycle init` once")
+    finally:
+        conn.close()
+
+
+def record_feedback(prediction_id: int, label: str, db_path: Path | str = DEFAULT_DB) -> bool:
+    if label not in LABELS:
+        raise ValueError("label must be phishing or legitimate")
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        previous = conn.execute("SELECT feedback,verification_status,verified_label FROM predictions WHERE id=?", (prediction_id,)).fetchone()
+        if previous is None:
+            return False
+        if previous["feedback"] == label and previous["verification_status"] in {"pending_verification", "verified", "rejected", "disputed"}:
+            return True
+        timestamp = utc_now()
+        is_verified = previous["verification_status"] == "verified"
+        conflicting_verified_label = is_verified and previous["verified_label"] != label
+        agrees_with_verified_label = is_verified and previous["verified_label"] == label
+        next_status = ("disputed" if conflicting_verified_label else
+                       "verified" if agrees_with_verified_label else "pending_verification")
+        if conflicting_verified_label:
+            cur = conn.execute("""UPDATE predictions SET feedback=?,feedback_timestamp=?,
+                verification_status='disputed',training_eligible=0 WHERE id=?""",
+                (label, timestamp, prediction_id))
+        elif agrees_with_verified_label:
+            cur = conn.execute("UPDATE predictions SET feedback=?,feedback_timestamp=? WHERE id=?",
+                               (label, timestamp, prediction_id))
+        else:
+            cur = conn.execute("""UPDATE predictions SET feedback=?, feedback_timestamp=?,
+                        verification_status='pending_verification',
+                        label_provenance='user_feedback', verified_label=NULL,
+                        verified_by=NULL, verified_at=NULL, training_eligible=0
+                        WHERE id=?""", (label, timestamp, prediction_id))
+        if cur.rowcount:
+            conn.execute("INSERT INTO feedback_events(prediction_id,label,provenance,received_at) VALUES (?,?,?,?)",
+                         (prediction_id, label, "user_feedback", timestamp))
+            conn.execute("""INSERT INTO label_audit
+                (prediction_id,action,status,label,provenance,created_at)
+                VALUES (?,?,?,?,?,?)""",
+                (prediction_id, "conflicting_feedback" if conflicting_verified_label else
+                 "feedback_consistent_with_verified" if agrees_with_verified_label else "feedback_received",
+                 next_status, label, "user_feedback", timestamp))
+        return cur.rowcount == 1
+
+
+def review_label(prediction_id: int, action: str, reviewer: str, provenance: str,
+                 label: str | None = None, reason: str = "", db_path: Path | str = DEFAULT_DB) -> None:
+    if action not in {"verify", "reject", "dispute"}:
+        raise ValueError("action must be verify, reject, or dispute")
+    reviewer, provenance = reviewer.strip(), provenance.strip()
+    if not reviewer or not provenance:
+        raise ValueError("reviewer and provenance are required")
+    if action == "verify" and label not in LABELS:
+        raise ValueError("verification requires phishing or legitimate label")
+    if action != "verify":
+        label = None
+    initialize_schema(db_path)
+    status = {"verify": "verified", "reject": "rejected", "dispute": "disputed"}[action]
+    timestamp = utc_now()
+    with connect(db_path) as conn:
+        row = conn.execute("SELECT id FROM predictions WHERE id=?", (prediction_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"prediction {prediction_id} not found")
+        eligible = 1 if action == "verify" else 0
+        conn.execute("""UPDATE predictions SET verification_status=?,
+            label_provenance=?, verified_label=?, verified_by=?, verified_at=?,
+            training_eligible=? WHERE id=?""",
+            (status, provenance, label, reviewer, timestamp, eligible, prediction_id))
+        conn.execute("""INSERT INTO label_audit
+            (prediction_id,action,status,label,provenance,reviewer,reason,created_at)
+            VALUES (?,?,?,?,?,?,?,?)""",
+            (prediction_id, action, status, label, provenance, reviewer, reason, timestamp))
+
+
+def _eligible_rows(conn: sqlite3.Connection, limit: int | None = None):
+    sql = """SELECT p.id,p.url,p.verified_label,p.label_provenance,p.verified_by,p.verified_at
+             FROM predictions p LEFT JOIN training_batch_records b ON b.prediction_id=p.id
+             WHERE p.training_eligible=1 AND p.verification_status='verified'
+               AND p.verified_label IN ('phishing','legitimate')
+               AND p.label_provenance IS NOT NULL AND b.prediction_id IS NULL
+             ORDER BY p.id"""
+    return conn.execute(sql + (" LIMIT ?" if limit else ""), (limit,) if limit else ()).fetchall()
+
+
+def export_batch(db_path: Path | str = DEFAULT_DB, output_dir: Path | str = DEFAULT_BATCH_DIR,
+                 limit: int | None = None) -> dict:
+    initialize_schema(db_path)
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        rows = _eligible_rows(conn, limit)
+        if not rows:
+            return {"created": False, "reason": "no_new_verified_records"}
+        # URL is deliberately included in the restricted batch used for training.
+        data = "".join(f"{row['verified_label']}\t{row['url']}\n" for row in rows).encode("utf-8")
+        fingerprint = hashlib.sha256(data).hexdigest()
+        batch_id = f"batch-{fingerprint[:16]}"
+        existing = conn.execute("SELECT batch_id,manifest_path FROM training_batches WHERE fingerprint=?", (fingerprint,)).fetchone()
+        if existing:
+            return {"created": False, "reason": "already_exported", "batch_id": existing["batch_id"], "manifest_path": existing["manifest_path"]}
+        counts = Counter(row["verified_label"] for row in rows)
+        timestamp = utc_now()
+        batch_dir = out / batch_id
+        manifest = {
+            "batch_id": batch_id, "created_at_utc": timestamp,
+            "source_prediction_ids": [row["id"] for row in rows],
+            "record_count": len(rows), "label_distribution": dict(counts),
+            "label_provenance": dict(Counter(row["label_provenance"] for row in rows)),
+            "verification_status": "verified", "schema_version": SCHEMA_VERSION,
+            "preprocessing_version": PREPROCESSING_VERSION,
+            "duplicate_handling": "eligible source IDs exported once; duplicate URLs rejected",
+            "sha256": fingerprint,
+            "source_id_range": {"min": rows[0]["id"], "max": rows[-1]["id"]},
+            "validation": {"passed": True, "malformed": 0, "missing_url": 0,
+                           "invalid_urls": 0, "unknown_labels": 0},
+        }
+        urls = [row["url"] for row in rows]
+        if any(not isinstance(url, str) or not url.strip() for url in urls):
+            raise ValueError("eligible source contains missing URL")
+        if len(set(urls)) != len(urls):
+            raise ValueError("eligible source contains duplicate URLs; resolve before export")
+        from mlops.dvc.validate_splits import _domain
+        invalid = [row["id"] for row in rows
+                   if row["verified_label"] not in LABELS
+                   or not row["label_provenance"]
+                   or _domain(row["url"]) is None]
+        if invalid:
+            raise ValueError(f"eligible source has invalid label, provenance, or URL at prediction IDs: {invalid[:20]}")
+        staging_dir = Path(tempfile.mkdtemp(prefix=f".{batch_id}-", dir=out))
+        try:
+            (staging_dir / "train.tsv").write_bytes(data)
+            (staging_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            for path in (staging_dir / "train.tsv", staging_dir / "manifest.json"):
+                path.chmod(0o444)
+            conn.execute("""INSERT INTO training_batches VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (batch_id, timestamp, len(rows), counts["phishing"], counts["legitimate"], fingerprint,
+                 str(batch_dir / "manifest.json"), SCHEMA_VERSION, rows[0]["id"], rows[-1]["id"]))
+            conn.executemany("INSERT INTO training_batch_records(prediction_id,batch_id) VALUES (?,?)",
+                             [(row["id"], batch_id) for row in rows])
+            active = conn.execute("SELECT job_id FROM retraining_jobs WHERE status IN ('eligible','running') ORDER BY created_at DESC LIMIT 1").fetchone()
+            if active:
+                conn.execute("UPDATE retraining_jobs SET batch_id=?,updated_at=? WHERE job_id=?",
+                             (batch_id, utc_now(), active["job_id"]))
+            staging_dir.replace(batch_dir)  # Same-volume atomic directory rename.
+        except Exception:
+            if staging_dir.exists():
+                for path in staging_dir.iterdir():
+                    path.chmod(0o666)
+                shutil.rmtree(staging_dir, ignore_errors=True)
+            raise
+        return {"created": True, **manifest, "directory": str(batch_dir)}
+
+
+def preview_batch(db_path: Path | str = DEFAULT_DB, limit: int | None = None) -> dict:
+    """Read-only summary of the next exportable verified rows."""
+    require_schema(db_path)
+    with connect(db_path) as conn:
+        rows = _eligible_rows(conn, limit)
+        distribution = Counter(row["verified_label"] for row in rows)
+        source_ids = [row["id"] for row in rows]
+        return {"dry_run": True, "record_count": len(rows),
+                "label_distribution": dict(distribution),
+                "source_prediction_ids": source_ids,
+                "source_id_range": ({"min": min(source_ids), "max": max(source_ids)} if source_ids else None),
+                "eligible": bool(rows)}
+
+
+def check_eligibility(db_path: Path | str = DEFAULT_DB, min_records: int | None = None,
+                      min_per_class: int | None = None, review_days: int | None = None,
+                      cooldown_days: int | None = None, now: datetime | None = None) -> dict:
+    require_schema(db_path)
+    min_records = min_records if min_records is not None else int(os.getenv("PHISHGUARD_MIN_NEW_VERIFIED_RECORDS", "1000"))
+    min_per_class = min_per_class if min_per_class is not None else int(os.getenv("PHISHGUARD_MIN_RECORDS_PER_CLASS", "100"))
+    review_days = review_days if review_days is not None else int(os.getenv("PHISHGUARD_REVIEW_INTERVAL_DAYS", "30"))
+    cooldown_days = cooldown_days if cooldown_days is not None else int(os.getenv("PHISHGUARD_RETRAINING_COOLDOWN_DAYS", "7"))
+    now = now or datetime.now(timezone.utc)
+    with connect(db_path) as conn:
+        rows = _eligible_rows(conn)
+        counts = Counter(row["verified_label"] for row in rows)
+        last = conn.execute("SELECT value FROM retraining_state WHERE key='last_success_at'").fetchone()
+        last_snapshot = conn.execute("SELECT value FROM retraining_state WHERE key='last_snapshot_at'").fetchone()
+        active = conn.execute("SELECT job_id,status FROM retraining_jobs WHERE status IN ('eligible','running')").fetchone()
+        last_time = datetime.fromisoformat(last["value"]) if last else None
+        due = not last_time or now - last_time >= timedelta(days=review_days)
+        cooldown_ok = not last_time or now - last_time >= timedelta(days=cooldown_days)
+        batch_ready = len(rows) >= min_records and counts["phishing"] >= min_per_class and counts["legitimate"] >= min_per_class
+        class_counts_ok = counts["phishing"] >= min_per_class and counts["legitimate"] >= min_per_class
+        no_new = len(rows) == 0
+        eligible = not active and cooldown_ok and not no_new and class_counts_ok and (batch_ready or due)
+        reasons = []
+        if active: reasons.append("active_job_exists")
+        if not cooldown_ok: reasons.append("cooldown_active")
+        if no_new: reasons.append("no_new_verified_data")
+        if not batch_ready and not due: reasons.append("thresholds_not_met_and_review_not_due")
+        if len(rows) and not class_counts_ok: reasons.append("minimum_per_class_not_met")
+        return {"eligible": eligible, "decision": "eligible" if eligible else "noop_or_deferred",
+                "reasons": reasons or (["batch_threshold_met"] if batch_ready else ["time_review_due"]),
+                "new_verified_records": len(rows), "class_counts": dict(counts),
+                "min_records": min_records, "min_per_class": min_per_class,
+                "review_days": review_days, "cooldown_days": cooldown_days,
+                "last_success_at": last["value"] if last else None,
+                "last_snapshot_at": last_snapshot["value"] if last_snapshot else None,
+                "active_job": dict(active) if active else None,
+                "dry_run": True}
+
+
+def scheduled_review(db_path: Path | str = DEFAULT_DB, **kwargs) -> dict:
+    """Persist a review decision only; never launches training."""
+    decision = check_eligibility(db_path, **kwargs)
+    now = utc_now()
+    with connect(db_path) as conn:
+        if decision["eligible"]:
+            job_id = str(uuid.uuid4())
+            try:
+                conn.execute("INSERT INTO retraining_jobs(job_id,status,reason,created_at,updated_at) VALUES (?,'eligible',?,?,?)",
+                             (job_id, ",".join(decision["reasons"]), now, now))
+            except sqlite3.IntegrityError:
+                decision.update(eligible=False, decision="noop_or_deferred", reasons=["concurrent_job_exists"])
+            else:
+                decision["job_id"] = job_id
+                decision["decision"] = "eligible_manual_worker_required"
+        conn.execute("INSERT INTO retraining_state(key,value) VALUES('last_review_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (now,))
+    decision["training_started"] = False
+    return decision
+
+
+def claim_job(job_id: str, db_path: Path | str = DEFAULT_DB) -> bool:
+    """Atomically claim an eligible job for a future offline worker."""
+    initialize_schema(db_path)
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        cur = conn.execute("UPDATE retraining_jobs SET status='running',updated_at=? WHERE job_id=? AND status='eligible'",
+                           (utc_now(), job_id))
+        return cur.rowcount == 1
+
+
+def finish_job(job_id: str, success: bool, db_path: Path | str = DEFAULT_DB,
+               error: str | None = None, snapshot_id: str | None = None,
+               blocked: bool = False) -> None:
+    """Record worker completion; failed attempts do not consume a snapshot."""
+    initialize_schema(db_path)
+    timestamp = utc_now()
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT status FROM retraining_jobs WHERE job_id=?", (job_id,)).fetchone()
+        if row is None or row["status"] != "running":
+            raise ValueError("only a running retraining job can be completed")
+        if success and blocked:
+            raise ValueError("a successful job cannot be blocked")
+        status = "completed" if success else ("blocked" if blocked else "failed")
+        conn.execute("UPDATE retraining_jobs SET status=?,updated_at=?,error=? WHERE job_id=?",
+                     (status, timestamp, error, job_id))
+        if success:
+            conn.execute("INSERT INTO retraining_state(key,value) VALUES('last_success_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (timestamp,))
+            if snapshot_id:
+                conn.execute("INSERT INTO retraining_state(key,value) VALUES('last_snapshot_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (snapshot_id,))
+
+
+def retry_job(job_id: str, db_path: Path | str = DEFAULT_DB) -> bool:
+    """Requeue only a failed job; its recorded batch_id remains unchanged."""
+    initialize_schema(db_path)
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        cur = conn.execute("UPDATE retraining_jobs SET status='eligible',updated_at=?,error=NULL WHERE job_id=? AND status='failed'",
+                           (utc_now(), job_id))
+        return cur.rowcount == 1
+
+
+def cli() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", type=Path, default=Path(os.getenv("PHISHGUARD_DATABASE_PATH", str(DEFAULT_DB))))
+    subs = parser.add_subparsers(dest="command", required=True)
+    for action in ("verify", "reject", "dispute"):
+        command = subs.add_parser(action)
+        command.add_argument("prediction_id", type=int)
+        command.add_argument("--reviewer", required=True)
+        command.add_argument("--provenance", required=True)
+        command.add_argument("--reason", default="")
+        if action == "verify": command.add_argument("--label", choices=sorted(LABELS), required=True)
+    export = subs.add_parser("export-batch")
+    export.add_argument("--output", type=Path, default=DEFAULT_BATCH_DIR)
+    export.add_argument("--limit", type=int)
+    preview = subs.add_parser("preview-batch")
+    preview.add_argument("--limit", type=int)
+    retry = subs.add_parser("retry-job")
+    retry.add_argument("job_id")
+    for name in ("init", "eligibility", "scheduled-review", "status"):
+        command = subs.add_parser(name)
+        if name != "status":
+            command.add_argument("--min-records", type=int)
+            command.add_argument("--min-per-class", type=int)
+            command.add_argument("--review-days", type=int)
+            command.add_argument("--cooldown-days", type=int)
+    args = parser.parse_args()
+    if args.command == "init":
+        initialize_schema(args.db)
+        result = {"initialized": True, "database": str(args.db)}
+    elif args.command in {"verify", "reject", "dispute"}:
+        review_label(args.prediction_id, args.command, args.reviewer, args.provenance,
+                     getattr(args, "label", None), args.reason, args.db)
+        result = {"prediction_id": args.prediction_id, "status": {"verify":"verified","reject":"rejected","dispute":"disputed"}[args.command]}
+    elif args.command == "export-batch":
+        result = export_batch(args.db, args.output, args.limit)
+    elif args.command == "preview-batch":
+        result = preview_batch(args.db, args.limit)
+    elif args.command == "retry-job":
+        result = {"job_id": args.job_id, "requeued": retry_job(args.job_id, args.db)}
+    elif args.command == "eligibility":
+        result = check_eligibility(args.db, args.min_records, args.min_per_class, args.review_days, args.cooldown_days)
+    elif args.command == "scheduled-review":
+        result = scheduled_review(args.db, min_records=args.min_records, min_per_class=args.min_per_class,
+                                  review_days=args.review_days, cooldown_days=args.cooldown_days)
+    else:
+        require_schema(args.db)
+        with connect(args.db) as conn:
+            result = {"batches": [dict(row) for row in conn.execute("SELECT * FROM training_batches ORDER BY created_at DESC LIMIT 10")],
+                      "jobs": [dict(row) for row in conn.execute("SELECT * FROM retraining_jobs ORDER BY created_at DESC LIMIT 10")]}
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli())
