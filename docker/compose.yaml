@@ -7,15 +7,17 @@ services:
     container_name: phishguard-api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      # Prediction and feedback are unauthenticated; /predictions contains full URLs.
+      # Keep the published service available only on this host by default.
+      - "127.0.0.1:8000:8000"
     volumes:
-      - phishguard-data:/app/mlops/data
+      - phishguard-data:/var/lib/phishguard
     healthcheck:
       test:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"
+        - "import json,urllib.request; h=json.load(urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5)); raise SystemExit(0 if h.get('status') == 'ready' and h.get('model_loaded') is True else 1)"
       interval: 30s
       timeout: 10s
       retries: 3

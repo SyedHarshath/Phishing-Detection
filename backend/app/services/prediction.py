@@ -1,6 +1,9 @@
 from ml.prediction import PhishingPredictor
 from backend.app.database import log_prediction
 
+class ModelUnavailableError(Exception):
+    """Raised only when model artifacts cannot be loaded."""
+
 class PredictionService:
     def __init__(self):
         self._predictor = None
@@ -27,7 +30,7 @@ class PredictionService:
         predictor = self.predictor
         if predictor is None:
             detail = self.load_error or "Model artifacts are not loaded."
-            raise RuntimeError(detail)
+            raise ModelUnavailableError(detail)
 
         result = predictor.predict(url)
         prediction_id = log_prediction(

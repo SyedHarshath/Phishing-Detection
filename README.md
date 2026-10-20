@@ -9,12 +9,14 @@ including typosquatting and phishing-specific lexical patterns.
 
 ## Quick Start
 
-Create and activate a Python environment, then install the project dependencies:
+Create and activate a Python environment, then install the project dependencies.
+The general development requirements are not fully pinned; use the Docker
+runtime constraints for a repeatable inference container. This repository does
+not automatically load `.env` files.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
@@ -24,10 +26,15 @@ Run the unit tests:
 python -m unittest discover -s test -v
 ```
 
-Start the FastAPI service:
+The suite includes a tiny synthetic TensorFlow fit and temporary registry
+promotion tests; those do not use the incumbent or production registry but do
+exercise isolated training/promotion code paths.
+
+Start FastAPI with an isolated database (PowerShell):
 
 ```powershell
-python -m uvicorn backend.app.main:app --reload
+$env:PHISHGUARD_DATABASE_PATH = Join-Path $env:TEMP 'optimus-local\predictions.sqlite'
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 
 The API will be available at:
@@ -36,7 +43,7 @@ The API will be available at:
 http://127.0.0.1:8000
 ```
 
-## Model Artifacts
+## Model Artifacts and Data Readiness
 
 Inference expects these local artifacts:
 
@@ -45,10 +52,12 @@ test_results/cnn_bilstm/best_model.h5
 ml/artifacts/tokenizer.json
 ```
 
-Large model files are intentionally ignored by Git. Restore them from the
-approved DVC/artifact source before running predictions or building the Docker
-image. If artifacts are missing, `/health` remains available and reports a
-degraded status.
+Large model files are intentionally ignored by Git. Obtain them through an
+authorized artifact source and verify them before running predictions/building
+the Docker image. The local dataset/DVC mismatch and incumbent training history
+remain unresolved; current artifact hashes do not prove historical provenance.
+If artifacts are missing, `/health` remains available and reports degraded;
+`/ready` returns 503 until model inference is ready.
 
 ## Architecture
 
@@ -86,5 +95,11 @@ python -m src.predict
 
 ## Browser Extension
 
-Start the backend on port 8000, then load the `extension/` folder as an
-unpacked Chrome or Edge extension.
+See [the professor demo](docs/PROFESSOR_DEMO_README.md), [deployment preparation](docs/PRODUCTION_DEPLOYMENT.md), and [extension release procedure](docs/EXTENSION_RELEASE.md). The extension requires a first-use data notice acceptance before sending URLs. Public deployment and Chrome Web Store release remain blocked by the readiness report.
+
+## Deployment and Privacy
+
+- [Production readiness report](docs/PRODUCTION_READINESS_REPORT.md)
+- [Privacy policy draft — requires completion and hosting](docs/PRIVACY_POLICY_DRAFT.md)
+- [Chrome Web Store checklist](docs/CHROME_WEB_STORE_CHECKLIST.md)
+- [Data handling notes](docs/DATA_AND_PRIVACY.md)

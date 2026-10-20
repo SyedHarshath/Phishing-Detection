@@ -16,12 +16,24 @@
       </div>
     </header>
 
+    <section id="consentPanel" class="consent-panel" aria-live="polite">
+      <h2>Before scanning</h2>
+      <p>When enabled, OPTIMUS automatically sends the full URL for each qualifying HTTP or HTTPS page visit, including its path, query parameters, and fragment when present. It excludes these hostnames and their subdomains: google.com, google.co.in, bing.com, yahoo.com, duckduckgo.com, ecosia.org, search.brave.com, yandex.com, and baidu.com. A manual popup scan also sends the entered URL. The configured service stores each successful prediction with the URL, prediction, confidence, model version, and timestamps. An authorized reviewer may access a URL you report to check its label. The server has no automatic URL deletion schedule.</p>
+      <p>A model result is an estimate, not a guarantee that a page is safe.</p>
+      <p id="consentGrantedNotice" class="hidden">Scanning is enabled. You can disable it here at any time.</p>
+      <label class="consent-choice"><input id="consentCheckbox" type="checkbox"> I agree to this collection and use, including reviewer access to URLs I report.</label>
+      <button id="enableScanButton" class="scan-button" disabled>Enable OPTIMUS scanning</button>
+      <button id="disableScanButton" class="text-button hidden" type="button">Disable scanning on this browser</button>
+      <a id="privacyPolicyLink" href="#consentPanel">Privacy information</a>
+      <small>Disabling stops future scans; it does not delete records already stored by the service.</small>
+    </section>
+
     <section class="url-section">
       <label for="url">Current URL</label>
       <textarea id="url" rows="3" spellcheck="false"></textarea>
     </section>
 
-    <button id="scanButton" class="scan-button">Scan URL</button>
+    <button id="scanButton" class="scan-button" disabled>Scan URL</button>
 
     <div id="status" class="status hidden"></div>
 
@@ -38,6 +50,8 @@
         <strong id="modelVersion">-</strong>
       </div>
     </section>
+
+    <p class="model-notice">OPTIMUS provides a model estimate, not a guarantee that a website is safe.</p>
 
     <footer>
       <span id="apiStatus">Checking API...</span>

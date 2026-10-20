@@ -1,5 +1,13 @@
 # PhishGuard — Phase 6: DVC
 
+> **Phase 7 safety notice:** the checked-in dataset pointer and local workspace do
+> not match, and the pointer-matching cached training file is unusable. Do not
+> run `dvc init`, `dvc add`, `dvc checkout`, `dvc pull`, `dvc repro`, or `dvc push`
+> against the current files. The general setup examples below are not safe to
+> execute for this checkout until an authorized source version is recovered and
+> reviewed. See [the provenance decision](../../docs/DATA_PROVENANCE_DECISION.md)
+> and [operational readiness runbook](../../docs/PHASE7_OPERATIONAL_READINESS.md).
+
 This phase adds **Data Version Control (DVC)** around the existing PhishGuard dataset.
 
 ## What this phase does

@@ -15,6 +15,63 @@ body {
   padding: 18px;
 }
 
+.consent-panel {
+  margin: 8px 0 14px;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.consent-panel h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.consent-panel p {
+  margin: 7px 0;
+}
+
+.consent-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.consent-choice input {
+  margin: 2px 0 0;
+}
+
+.consent-panel a,
+.consent-panel small {
+  display: block;
+  margin-top: 9px;
+}
+
+.consent-enabled > h2,
+.consent-enabled > p,
+.consent-enabled > .consent-choice,
+.consent-enabled > #enableScanButton {
+  display: none;
+}
+
+.consent-enabled > #consentGrantedNotice {
+  display: block;
+}
+
+.text-button {
+  display: block;
+  margin: 10px auto 0;
+  border: 0;
+  background: transparent;
+  color: #374151;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .header h1 {
   margin: 0;
   font-size: 24px;
@@ -123,6 +180,12 @@ footer {
   text-align: center;
   color: #6b7280;
   font-size: 11px;
+}
+
+.model-notice {
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .hidden {

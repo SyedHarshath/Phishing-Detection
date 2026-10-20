@@ -1,11 +1,13 @@
 import json
 import hashlib
+import os
 import sqlite3
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from mlops.data.lifecycle import (
     check_eligibility, claim_job, connect, export_batch, finish_job,
@@ -15,6 +17,10 @@ from mlops.data.lifecycle import (
 
 class LabelLifecycleTests(unittest.TestCase):
     def setUp(self):
+        # Explicitly opt into job creation only in this isolated test fixture.
+        self.dispatch_env = patch.dict(os.environ, {"RETRAIN_AUTO_ENABLED": "true"})
+        self.dispatch_env.start()
+        self.addCleanup(self.dispatch_env.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)

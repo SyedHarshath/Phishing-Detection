@@ -226,6 +226,14 @@ class ModelPromotionRegistryTests(unittest.TestCase):
                     response = client.post("/predict", json={"url": "https://api-active-check.invalid/"})
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.json()["model_version"], "legacy-incumbent")
+                    prediction_id = response.json()["prediction_id"]
+                    feedback = client.post("/feedback", json={
+                        "prediction_id": prediction_id, "actual_label": "phishing"})
+                    self.assertEqual(feedback.status_code, 200)
+                    from mlops.data.lifecycle import preview_batch
+                    preview = preview_batch(api_db)
+                    self.assertFalse(preview["eligible"])
+                    self.assertEqual(preview["record_count"], 0)
         finally:
             prediction_service._predictor, prediction_service._load_error = old_predictor, old_error
         self.assertEqual(before, (_sha(model_path), _sha(tokenizer_path)))

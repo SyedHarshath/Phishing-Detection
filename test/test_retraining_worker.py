@@ -29,7 +29,7 @@ class RetrainingWorkerTests(unittest.TestCase):
         conn = sqlite3.connect(self.db)
         self.connections.append(conn)
         with conn:
-            conn.execute("INSERT INTO retraining_jobs VALUES('job','eligible','test','now','now',NULL,NULL)")
+            conn.execute("INSERT INTO retraining_jobs(job_id,status,reason,created_at,updated_at,batch_id,error) VALUES('job','eligible','test','now','now',NULL,NULL)")
         dvc_calls = []
         result = run_worker("job", db_path=self.db, batch_root=self.root / "batches",
             dataset=self.root / "dataset", validation_report=self.root / "missing.json",

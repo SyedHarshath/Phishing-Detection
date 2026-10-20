@@ -1,4 +1,7 @@
 const API_BASE = "http://127.0.0.1:8000";
+// Bump when collection scope, destinations, storage, or use changes.
+const CONSENT_VERSION = "2026-10-20-nav-url-scope-v2";
+const pendingScans = new Map();
 const EXCLUDED_DOMAINS = [
   "google.com", "google.co.in", "bing.com", "yahoo.com",
   "duckduckgo.com", "ecosia.org", "search.brave.com",
@@ -11,7 +14,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   const url = tab.url;
   if (!isScannableUrl(url) || isExcludedDomain(url)) return;
 
-  scanUrl(url).then(result => {
+  hasConsent().then(consented => consented ? scanUrl(url) : null).then(result => {
+    if (!result) return;
     chrome.tabs.sendMessage(tabId, {
       action: "showResult",
       data: result
@@ -23,7 +27,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "predict") {
-    scanUrl(message.url).then(data =>
+    hasConsent().then(consented => {
+      if (!consented) throw new Error("Open OPTIMUS and accept the data notice before scanning.");
+      return scanUrl(message.url);
+    }).then(data =>
       sendResponse({success: true, data})
     ).catch(error =>
       sendResponse({success: false, error: error.message})
@@ -32,7 +39,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "feedback") {
-    sendFeedback(message.predictionId, message.actualLabel).then(data =>
+    hasConsent().then(consented => {
+      if (!consented) throw new Error("Enable OPTIMUS scanning in the popup before sending feedback.");
+      return sendFeedback(message.predictionId, message.actualLabel);
+    }).then(data =>
       sendResponse({success: true, data})
     ).catch(error =>
       sendResponse({success: false, error: error.message})
@@ -42,7 +52,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function scanUrl(url) {
-  const response = await fetch(`${API_BASE}/predict`, {
+  if (pendingScans.has(url)) return pendingScans.get(url);
+  const pending = performScan(url);
+  pendingScans.set(url, pending);
+  try {
+    return await pending;
+  } finally {
+    if (pendingScans.get(url) === pending) pendingScans.delete(url);
+  }
+}
+
+async function performScan(url) {
+  const response = await fetchWithTimeout(`${API_BASE}/predict`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({url})
@@ -60,7 +81,7 @@ async function scanUrl(url) {
 }
 
 async function sendFeedback(predictionId, actualLabel) {
-  const response = await fetch(`${API_BASE}/feedback`, {
+  const response = await fetchWithTimeout(`${API_BASE}/feedback`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
@@ -78,6 +99,24 @@ async function sendFeedback(predictionId, actualLabel) {
     throw new Error(detail);
   }
   return await response.json();
+}
+
+async function fetchWithTimeout(url, options) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    return await fetch(url, {...options, signal: controller.signal});
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("OPTIMUS request timed out.");
+    throw new Error("OPTIMUS service could not be reached.");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function hasConsent() {
+  const stored = await chrome.storage.local.get("optimusConsentVersion");
+  return stored.optimusConsentVersion === CONSENT_VERSION;
 }
 
 function isScannableUrl(url) {

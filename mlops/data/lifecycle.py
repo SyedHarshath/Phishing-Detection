@@ -1,7 +1,8 @@
-"""SQLite label governance, immutable batch export, and offline eligibility.
+"""SQLite label governance, immutable batch export, and retraining eligibility.
 
 User feedback is always unverified. Only an explicit reviewer decision can
-make a row eligible for training. This module never starts training.
+make a row eligible for training. The CLI delegates eligible jobs to the
+isolated worker; it never evaluates or promotes a candidate by default.
 """
 from __future__ import annotations
 
@@ -120,10 +121,17 @@ def initialize_schema(db_path: Path | str = DEFAULT_DB) -> None:
                 batch_id TEXT,
                 error TEXT
             )""",
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_retraining_job ON retraining_jobs(status) WHERE status IN ('eligible','running')",
+            "ALTER TABLE retraining_jobs ADD COLUMN details TEXT NOT NULL DEFAULT '{}'",
+            "DROP INDEX IF EXISTS idx_one_active_retraining_job",
+            "CREATE UNIQUE INDEX idx_one_active_retraining_job ON retraining_jobs((1)) WHERE status IN ('eligible','running','training_completed','evaluating','awaiting_approval','promoting')",
         )
         for statement in statements:
-            conn.execute(statement)
+            try:
+                conn.execute(statement)
+            except sqlite3.OperationalError as exc:
+                if statement.startswith("ALTER TABLE retraining_jobs ADD COLUMN details") and "duplicate column" in str(exc).lower():
+                    continue
+                raise
         # Existing user feedback is preserved and marked as a claim awaiting review.
         conn.execute("""UPDATE predictions SET verification_status='pending_verification',
                     label_provenance=COALESCE(label_provenance,'user_feedback')
@@ -293,7 +301,7 @@ def export_batch(db_path: Path | str = DEFAULT_DB, output_dir: Path | str = DEFA
                  str(batch_dir / "manifest.json"), SCHEMA_VERSION, rows[0]["id"], rows[-1]["id"]))
             conn.executemany("INSERT INTO training_batch_records(prediction_id,batch_id) VALUES (?,?)",
                              [(row["id"], batch_id) for row in rows])
-            active = conn.execute("SELECT job_id FROM retraining_jobs WHERE status IN ('eligible','running') ORDER BY created_at DESC LIMIT 1").fetchone()
+            active = conn.execute("SELECT job_id FROM retraining_jobs WHERE status IN ('eligible','running','training_completed','evaluating','awaiting_approval','promoting') ORDER BY created_at DESC LIMIT 1").fetchone()
             if active:
                 conn.execute("UPDATE retraining_jobs SET batch_id=?,updated_at=? WHERE job_id=?",
                              (batch_id, utc_now(), active["job_id"]))
@@ -323,11 +331,12 @@ def preview_batch(db_path: Path | str = DEFAULT_DB, limit: int | None = None) ->
 
 def check_eligibility(db_path: Path | str = DEFAULT_DB, min_records: int | None = None,
                       min_per_class: int | None = None, review_days: int | None = None,
-                      cooldown_days: int | None = None, now: datetime | None = None) -> dict:
+                      cooldown_days: int | None = None, now: datetime | None = None,
+                      interval_hours: int | None = None) -> dict:
     require_schema(db_path)
     min_records = min_records if min_records is not None else int(os.getenv("PHISHGUARD_MIN_NEW_VERIFIED_RECORDS", "1000"))
     min_per_class = min_per_class if min_per_class is not None else int(os.getenv("PHISHGUARD_MIN_RECORDS_PER_CLASS", "100"))
-    review_days = review_days if review_days is not None else int(os.getenv("PHISHGUARD_REVIEW_INTERVAL_DAYS", "30"))
+    interval_hours = interval_hours if interval_hours is not None else (review_days * 24 if review_days is not None else int(os.getenv("RETRAIN_INTERVAL_HOURS", str(int(os.getenv("PHISHGUARD_REVIEW_INTERVAL_DAYS", "30")) * 24))))
     cooldown_days = cooldown_days if cooldown_days is not None else int(os.getenv("PHISHGUARD_RETRAINING_COOLDOWN_DAYS", "7"))
     now = now or datetime.now(timezone.utc)
     with connect(db_path) as conn:
@@ -335,9 +344,9 @@ def check_eligibility(db_path: Path | str = DEFAULT_DB, min_records: int | None 
         counts = Counter(row["verified_label"] for row in rows)
         last = conn.execute("SELECT value FROM retraining_state WHERE key='last_success_at'").fetchone()
         last_snapshot = conn.execute("SELECT value FROM retraining_state WHERE key='last_snapshot_at'").fetchone()
-        active = conn.execute("SELECT job_id,status FROM retraining_jobs WHERE status IN ('eligible','running')").fetchone()
+        active = conn.execute("SELECT job_id,status FROM retraining_jobs WHERE status IN ('eligible','running','training_completed','evaluating','awaiting_approval','promoting')").fetchone()
         last_time = datetime.fromisoformat(last["value"]) if last else None
-        due = not last_time or now - last_time >= timedelta(days=review_days)
+        due = not last_time or now - last_time >= timedelta(hours=interval_hours)
         cooldown_ok = not last_time or now - last_time >= timedelta(days=cooldown_days)
         batch_ready = len(rows) >= min_records and counts["phishing"] >= min_per_class and counts["legitimate"] >= min_per_class
         class_counts_ok = counts["phishing"] >= min_per_class and counts["legitimate"] >= min_per_class
@@ -353,7 +362,7 @@ def check_eligibility(db_path: Path | str = DEFAULT_DB, min_records: int | None 
                 "reasons": reasons or (["batch_threshold_met"] if batch_ready else ["time_review_due"]),
                 "new_verified_records": len(rows), "class_counts": dict(counts),
                 "min_records": min_records, "min_per_class": min_per_class,
-                "review_days": review_days, "cooldown_days": cooldown_days,
+                "interval_hours": interval_hours, "cooldown_days": cooldown_days,
                 "last_success_at": last["value"] if last else None,
                 "last_snapshot_at": last_snapshot["value"] if last_snapshot else None,
                 "active_job": dict(active) if active else None,
@@ -362,14 +371,19 @@ def check_eligibility(db_path: Path | str = DEFAULT_DB, min_records: int | None 
 
 def scheduled_review(db_path: Path | str = DEFAULT_DB, **kwargs) -> dict:
     """Persist a review decision only; never launches training."""
+    if os.getenv("RETRAIN_AUTO_ENABLED", "false").strip().lower() != "true":
+        return {"eligible": False, "decision": "disabled", "reasons": ["automatic_retraining_disabled"],
+                "training_started": False}
     decision = check_eligibility(db_path, **kwargs)
     now = utc_now()
     with connect(db_path) as conn:
         if decision["eligible"]:
             job_id = str(uuid.uuid4())
             try:
-                conn.execute("INSERT INTO retraining_jobs(job_id,status,reason,created_at,updated_at) VALUES (?,'eligible',?,?,?)",
-                             (job_id, ",".join(decision["reasons"]), now, now))
+                latest_batch = conn.execute("SELECT batch_id FROM training_batches ORDER BY created_at DESC LIMIT 1").fetchone()
+                conn.execute("INSERT INTO retraining_jobs(job_id,status,reason,created_at,updated_at,batch_id) VALUES (?,'eligible',?,?,?,?)",
+                             (job_id, ",".join(decision["reasons"]), now, now,
+                              latest_batch["batch_id"] if latest_batch else None))
             except sqlite3.IntegrityError:
                 decision.update(eligible=False, decision="noop_or_deferred", reasons=["concurrent_job_exists"])
             else:
@@ -392,7 +406,7 @@ def claim_job(job_id: str, db_path: Path | str = DEFAULT_DB) -> bool:
 
 def finish_job(job_id: str, success: bool, db_path: Path | str = DEFAULT_DB,
                error: str | None = None, snapshot_id: str | None = None,
-               blocked: bool = False) -> None:
+               blocked: bool = False, success_status: str = "completed") -> None:
     """Record worker completion; failed attempts do not consume a snapshot."""
     initialize_schema(db_path)
     timestamp = utc_now()
@@ -403,7 +417,7 @@ def finish_job(job_id: str, success: bool, db_path: Path | str = DEFAULT_DB,
             raise ValueError("only a running retraining job can be completed")
         if success and blocked:
             raise ValueError("a successful job cannot be blocked")
-        status = "completed" if success else ("blocked" if blocked else "failed")
+        status = success_status if success else ("blocked" if blocked else "failed")
         conn.execute("UPDATE retraining_jobs SET status=?,updated_at=?,error=? WHERE job_id=?",
                      (status, timestamp, error, job_id))
         if success:
@@ -419,6 +433,35 @@ def retry_job(job_id: str, db_path: Path | str = DEFAULT_DB) -> bool:
         conn.execute("BEGIN IMMEDIATE")
         cur = conn.execute("UPDATE retraining_jobs SET status='eligible',updated_at=?,error=NULL WHERE job_id=? AND status='failed'",
                            (utc_now(), job_id))
+        return cur.rowcount == 1
+
+
+def recover_interrupted_job(job_id: str, db_path: Path | str = DEFAULT_DB) -> bool:
+    """Explicitly requeue a confirmed-dead worker claim; the batch stays fixed."""
+    initialize_schema(db_path)
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        cur = conn.execute("UPDATE retraining_jobs SET status='eligible',updated_at=?,error='recovered_interrupted_worker' WHERE job_id=? AND status='running'",
+                           (utc_now(), job_id))
+        return cur.rowcount == 1
+
+
+def update_job(job_id: str, status: str, *, details: dict | None = None,
+               error: str | None = None, db_path: Path | str = DEFAULT_DB) -> bool:
+    """Persist orchestration stage metadata without changing batch provenance."""
+    with connect(db_path) as conn:
+        cur = conn.execute("UPDATE retraining_jobs SET status=?,updated_at=?,details=?,error=? WHERE job_id=?",
+            (status, utc_now(), json.dumps(details or {}, sort_keys=True), error, job_id))
+        return cur.rowcount == 1
+
+
+def claim_approval(job_id: str, db_path: Path | str = DEFAULT_DB) -> bool:
+    """Claim a pending operator approval so concurrent requests cannot promote twice."""
+    initialize_schema(db_path)
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        cur = conn.execute("UPDATE retraining_jobs SET status='promoting',updated_at=? "
+                           "WHERE job_id=? AND status='awaiting_approval'", (utc_now(), job_id))
         return cur.rowcount == 1
 
 
@@ -440,6 +483,8 @@ def cli() -> int:
     preview.add_argument("--limit", type=int)
     retry = subs.add_parser("retry-job")
     retry.add_argument("job_id")
+    recover = subs.add_parser("recover-job")
+    recover.add_argument("job_id", help="running job whose worker has been confirmed stopped")
     for name in ("init", "eligibility", "scheduled-review", "status"):
         command = subs.add_parser(name)
         if name != "status":
@@ -447,6 +492,20 @@ def cli() -> int:
             command.add_argument("--min-per-class", type=int)
             command.add_argument("--review-days", type=int)
             command.add_argument("--cooldown-days", type=int)
+        if name == "scheduled-review":
+            command.add_argument("--provenance-manifest", type=Path,
+                help="verified source provenance manifest required before training")
+            command.add_argument("--evaluation-tsv", type=Path)
+            command.add_argument("--evaluation-manifest", type=Path)
+            command.add_argument("--policy", type=Path)
+            command.add_argument("--promotion-provenance", type=Path)
+            command.add_argument("--registry", type=Path)
+            command.add_argument("--confirm-promotion", action="store_true")
+    approval = subs.add_parser("approve-job")
+    approval.add_argument("job_id")
+    approval.add_argument("--confirm", action="store_true")
+    promotion_recovery = subs.add_parser("recover-promotion")
+    promotion_recovery.add_argument("job_id", help="promoting job after confirming its process has stopped")
     args = parser.parse_args()
     if args.command == "init":
         initialize_schema(args.db)
@@ -461,11 +520,26 @@ def cli() -> int:
         result = preview_batch(args.db, args.limit)
     elif args.command == "retry-job":
         result = {"job_id": args.job_id, "requeued": retry_job(args.job_id, args.db)}
+    elif args.command == "recover-job":
+        result = {"job_id": args.job_id, "recovered": recover_interrupted_job(args.job_id, args.db)}
     elif args.command == "eligibility":
         result = check_eligibility(args.db, args.min_records, args.min_per_class, args.review_days, args.cooldown_days)
     elif args.command == "scheduled-review":
-        result = scheduled_review(args.db, min_records=args.min_records, min_per_class=args.min_per_class,
-                                  review_days=args.review_days, cooldown_days=args.cooldown_days)
+        from mlops.retraining.worker import dispatch_scheduled_job
+        result = dispatch_scheduled_job(db_path=args.db, min_records=args.min_records,
+            min_per_class=args.min_per_class, review_days=args.review_days,
+            cooldown_days=args.cooldown_days,
+            provenance_manifest=args.provenance_manifest,
+            evaluation_tsv=args.evaluation_tsv,
+            evaluation_manifest=args.evaluation_manifest, policy_path=args.policy,
+            promotion_provenance=args.promotion_provenance, registry_root=args.registry,
+            confirm_promotion=args.confirm_promotion)
+    elif args.command == "approve-job":
+        from mlops.retraining.worker import approve_job
+        result = approve_job(args.job_id, db_path=args.db, confirm=args.confirm)
+    elif args.command == "recover-promotion":
+        from mlops.retraining.worker import recover_interrupted_approval
+        result = recover_interrupted_approval(args.job_id, db_path=args.db)
     else:
         require_schema(args.db)
         with connect(args.db) as conn:

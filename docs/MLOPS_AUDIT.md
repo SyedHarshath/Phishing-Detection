@@ -4,7 +4,7 @@
 
 The checkout contains a Streamlit UI (`src/app.py`), a FastAPI service (`backend/app`), a Chrome extension (`extension`), shared TensorFlow inference (`ml/prediction.py`, `ml/preprocessing.py`), smoke training/evaluation (`src/train_smoke.py`, `src/evaluate_smoke.py`), dataset inspection (`mlops/dvc`), MLflow helpers, and SQLite monitoring. The extension scans HTTP(S) tab navigations except configured search domains and posts the URL to `/predict`; it attaches a feedback action to each UI result.
 
-The prediction API lazily loads `test_results/cnn_bilstm/best_model.h5` with `ml/artifacts/tokenizer.json`; tokenization lowercases URLs and pads/truncates to 200. Its class order is `phishing`, `legitimate`. `src/app.py` is a separate Streamlit path with hard-coded `D:\dephides` artifact locations and a trusted-domain bypass; it is not the API implementation.
+The prediction API lazily loads the active model bundle when available, otherwise it falls back to `test_results/cnn_bilstm/best_model.h5` with `ml/artifacts/tokenizer.json`; tokenization lowercases URLs and pads/truncates to 200. Its class order is `phishing`, `legitimate`. `src/app.py` uses the same `PhishingPredictor` and caches it for the Streamlit process. It defines `is_trusted_heuristic`, but current scan flow does not call that helper, so it does not bypass model inference.
 
 The existing SQLite `predictions` table contains 77 rows at audit time. It stores raw URLs, prediction, confidence, model version, a feedback label and timestamp. Feedback is user-reported and currently overwritable; it is not ground truth. DB SHA-256 at audit: `0e4ce3db4cdb0a3c43555caed74f207f9e64379df0f69ac84b45b77dd0ad756d`.
 
@@ -18,8 +18,8 @@ Production model SHA-256: `f12c216a8e840cbf099288e7b2350acfd956d71dd2f0478da79ad
 
 | Area | Observed state / risk |
 |---|---|
-| Inference | Lazy singleton model load; `/health`, `/model-info`, `/predict`, `/feedback`, `/predictions`. No API authentication or request timeout configuration. Exception response can expose internals. |
-| Logging/privacy | SQLite stores full URL including query; no retention, correlation ID, latency, event UUID, or migration system. `/predictions` returns full URLs without auth. |
+| Inference | Lazy singleton model load; `/health`, `/model-info`, `/predict`, `/feedback`, `/predictions`. API errors are sanitized; `/predict` validates HTTP(S) host/port and distinguishes typed model-load failures from inference failures. `/predictions` requires a configured shared token. There is still no request timeout configuration. |
+| Logging/privacy | SQLite stores full URL including query; no retention, correlation ID, latency, or event UUID. `/predictions` omits URLs by default and requires the shared token; callers can explicitly request URL data. The token is not user-level authorization. Compose loopback binding is only defense in depth; remote access requires a trusted TLS/network boundary. |
 | Feedback | User claims now remain pending; reviewer CLI controls verification/rejection/dispute and writes an audit trail. No trusted external verification integration exists. |
 | Data | Local TSV splits are readable but have malformed records. Existing loader silently skips malformed rows and samples each split. Existing inspector reports parseability, not URL/domain leakage. New strict validator fails closed and reports exact URL/domain overlap. |
 | Training | Bounded smoke candidate trainer, train-only tokenizer, validation checkpointing, test metrics, separate `artifacts/` output. It is explicitly limited to 1–3 epochs and is not full production retraining. No incumbent comparison/promotion/rollback. |
@@ -29,6 +29,14 @@ Production model SHA-256: `f12c216a8e840cbf099288e7b2350acfd956d71dd2f0478da79ad
 | Extension | Direct loopback HTTP API, no request timeout, endpoint is fixed. Feedback is an unverified report. |
 | Tests | Existing unittest suite and added strict-validator fixtures. A full suite may run a TensorFlow smoke fit; do not use it where compute/time is constrained. |
 
+## Phase 7 operational readiness (2026-10-18)
+
+The audit began with a clean `main` checkout at `f863014`. Health and model-info responses now avoid returning local load paths, prediction errors are generic, and malformed non-HTTP(S) inputs are separated from inference failures. The API database path honors `PHISHGUARD_DATABASE_PATH`, enabling isolated operational checks. Compose binds its port to loopback and marks the container unhealthy if its model is not loaded. Current `/predictions` access requires a configured shared token and omits URLs by default. The DVC README warns against pointer-changing commands while provenance is disputed.
+
+The operator and recovery procedures are in `docs/PHASE7_OPERATIONAL_READINESS.md`. The full suite passed 72 tests, including the real-artifact compatibility smoke using a temporary registry/database and a reserved `.invalid` URL; user feedback in that flow remained ineligible for batch export. Five API operational-safety tests also passed. Compile/import checks, `pip check`, and `git diff --check` passed. The small fixture training test is synthetic; no production training, service startup, Docker build, MLflow operation, data restore, or full overlap scan was run.
+
+The model, tokenizer, prediction database, MLflow database, and train/validation/test hashes match their respective freeze or prior audit records after tests. No tracked model weights, runtime databases, or dataset split bytes are available in Git; these are ignored local artifacts. The active local artifacts therefore still require separate verified backups and cannot be reconstructed from a clean clone. No production state was changed.
+
 ## Verification performed
 
 - Read-only schema inspection: existing `predictions` table, 77 rows.
@@ -36,7 +44,7 @@ Production model SHA-256: `f12c216a8e840cbf099288e7b2350acfd956d71dd2f0478da79ad
 - `dvc status`: default failed because the site cache resolves outside writable workspace; process-local cache override succeeded and exposed dataset/pipeline drift.
 - Captured model, tokenizer, and DB hashes above.
 - Loaded the production model/tokenizer in memory and predicted a synthetic `.invalid` URL successfully (phishing, 98.13%; this is a functional smoke result, not accuracy evidence).
-- Exercised FastAPI `/health`, `/predict`, `/feedback`, and `/predictions` with `TestClient` and a temporary database; all returned 200. The real database was not migrated.
+- The Phase 7 verification exercised FastAPI `/health`, `/predict`, `/feedback`, and `/predictions` with `TestClient` and a temporary database; all returned 200 under the then-current unauthenticated behavior. The real database was not migrated. Regression tests added afterward now verify the history-token gate and default URL omission.
 - No full training, DVC data mutation, or MLflow server operation was performed.
 
 ## Remaining critical limitations

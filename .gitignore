@@ -40,6 +40,12 @@ mlruns/
 mlflow.db
 mlops/data/*.db
 
+# Local feedback review exports can contain submitted URLs or reviewer data.
+mlops/data/feedback-disagreement-staging-*/
+
+# Generated extension distribution archives; keep source files in Git.
+/dist/*.zip
+
 # =========================
 # Logs
 # =========================

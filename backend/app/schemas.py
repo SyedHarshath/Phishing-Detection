@@ -1,8 +1,11 @@
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
+from backend.app.config import get_settings
+
+MAX_URL_LENGTH = get_settings().max_url_length
 
 class PredictionRequest(BaseModel):
-    url: str = Field(..., min_length=1)
+    url: str = Field(..., min_length=1, max_length=MAX_URL_LENGTH)
 
 class PredictionResponse(BaseModel):
     prediction_id: int
@@ -32,7 +35,7 @@ class FeedbackResponse(BaseModel):
 class PredictionLog(BaseModel):
     id: int
     timestamp: str
-    url: str
+    url: Optional[str] = None
     prediction: str
     confidence: float
     model_version: str

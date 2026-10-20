@@ -6,6 +6,7 @@ import numpy as np
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.text import tokenizer_from_json
 
+from backend.app.config import get_settings
 from ml.preprocessing import SEQUENCE_LENGTH, preprocess_url
 
 MODEL_NAME = "phishing-detector"
@@ -14,14 +15,17 @@ MODEL_VERSION = "1.0.0"
 class PhishingPredictor:
     def __init__(self, model_path=None, tokenizer_path=None):
         PROJECT_ROOT = Path(__file__).resolve().parent.parent
+        settings = get_settings()
         active_version = None
         if model_path is None and tokenizer_path is None:
-            active_manifest = Path(__import__("os").getenv(
-                "PHISHGUARD_ACTIVE_MODEL_MANIFEST",
-                str(PROJECT_ROOT / "artifacts" / "model_registry" / "active.json")))
+            active_manifest = settings.active_model_manifest
             if active_manifest.is_file():
                 from mlops.promotion.registry import resolve_active_paths
                 model_path, tokenizer_path, active_version = resolve_active_paths(active_manifest)
+            elif settings.model_path and settings.tokenizer_path:
+                model_path, tokenizer_path = settings.model_path, settings.tokenizer_path
+            elif settings.environment == "production":
+                raise FileNotFoundError("Configured production model manifest or artifact pair is unavailable")
         if model_path is None:
             model_path = (
                 PROJECT_ROOT
@@ -41,7 +45,7 @@ class PhishingPredictor:
         self.model_path = Path(model_path)
         self.tokenizer_path = Path(tokenizer_path)
         self.model_name = MODEL_NAME
-        self.model_version = active_version or MODEL_VERSION
+        self.model_version = active_version or settings.model_version or MODEL_VERSION
         self.sequence_length = SEQUENCE_LENGTH
         self.categories = ['phishing','legitimate']
 

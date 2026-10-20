@@ -1,10 +1,11 @@
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from backend.app.config import get_settings
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DB_DIR = PROJECT_ROOT / "mlops" / "data"
-DB_PATH = DB_DIR / "predictions.db"
+DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "mlops" / "data" / "predictions.db"
+DB_PATH = get_settings().database_path
+DB_DIR = DB_PATH.parent
 
 def get_connection():
     DB_DIR.mkdir(parents=True, exist_ok=True)

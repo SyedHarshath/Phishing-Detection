@@ -4,7 +4,9 @@ import sys
 import urllib.request
 import urllib.error
 
-BASE_URL = "http://127.0.0.1:8000"
+# The documented isolated smoke run binds only this host port. Do not point the
+# verification script at an existing demo or production endpoint.
+BASE_URL = "http://127.0.0.1:18000"
 
 def request(path, method="GET", payload=None):
     body = None
@@ -19,12 +21,12 @@ def request(path, method="GET", payload=None):
 
 def main():
     try:
-        status, health = request("/health")
+        status, health = request("/ready")
         print("HEALTH:", status, health)
         if status != 200 or health.get("model_loaded") is not True:
             raise RuntimeError("Health check failed.")
 
-        status, result = request("/predict", "POST", {"url": "https://example.com"})
+        status, result = request("/predict", "POST", {"url": "https://optimus-smoke.invalid/check"})
         print("PREDICT:", status, result)
         if status != 200:
             raise RuntimeError("Prediction request failed.")

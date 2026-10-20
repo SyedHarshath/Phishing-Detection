@@ -6,11 +6,39 @@ const resultBadge = document.getElementById("resultBadge");
 const confidence = document.getElementById("confidence");
 const modelVersion = document.getElementById("modelVersion");
 const apiStatus = document.getElementById("apiStatus");
+const consentPanel = document.getElementById("consentPanel");
+const consentCheckbox = document.getElementById("consentCheckbox");
+const enableScanButton = document.getElementById("enableScanButton");
+const disableScanButton = document.getElementById("disableScanButton");
+const consentGrantedNotice = document.getElementById("consentGrantedNotice");
+const API_BASE = "http://127.0.0.1:8000";
+// Keep in sync with background.js; bump when collection scope, destinations,
+// storage, or use changes so existing users must review the updated notice.
+const CONSENT_VERSION = "2026-10-20-nav-url-scope-v2";
 
 document.addEventListener("DOMContentLoaded", initialize);
 scanButton.addEventListener("click", scanUrl);
+consentCheckbox.addEventListener("change", () => {
+  enableScanButton.disabled = !consentCheckbox.checked;
+});
+enableScanButton.addEventListener("click", enableScanning);
+disableScanButton.addEventListener("click", disableScanning);
 
 async function initialize() {
+  const stored = await chrome.storage.local.get("optimusConsentVersion");
+  const consented = stored.optimusConsentVersion === CONSENT_VERSION;
+  consentPanel.classList.toggle("consent-enabled", consented);
+  consentGrantedNotice.classList.toggle("hidden", !consented);
+  consentCheckbox.checked = false;
+  enableScanButton.classList.toggle("hidden", consented);
+  disableScanButton.classList.toggle("hidden", !consented);
+  scanButton.disabled = !consented;
+  if (!consented) {
+    showStatus("Scanning is disabled until you review and accept the data notice.");
+    apiStatus.textContent = "Scanning disabled";
+    return;
+  }
+
   try {
     const tabs = await chrome.tabs.query({
       active: true,
@@ -82,7 +110,14 @@ async function scanUrl() {
 
 async function checkApi() {
   try {
-    const response = await fetch("http://127.0.0.1:8000/health");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    let response;
+    try {
+      response = await fetch(`${API_BASE}/health`, {signal: controller.signal});
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -96,6 +131,20 @@ async function checkApi() {
   } catch (_) {
     apiStatus.textContent = "API offline - Start FastAPI on port 8000";
   }
+}
+
+async function enableScanning() {
+  if (!consentCheckbox.checked) return;
+  await chrome.storage.local.set({
+    optimusConsentVersion: CONSENT_VERSION,
+    optimusConsentAt: new Date().toISOString()
+  });
+  await initialize();
+}
+
+async function disableScanning() {
+  await chrome.storage.local.remove(["optimusConsentVersion", "optimusConsentAt"]);
+  await initialize();
 }
 
 function displayResult(data) {

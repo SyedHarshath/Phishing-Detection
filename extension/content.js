@@ -63,7 +63,9 @@ function showPhishingWarning(data) {
 
   const legitimateButton = createButton("pg-legitimate", "Actually Legitimate");
   legitimateButton.onclick = () => submitFeedback("legitimate");
-  feedback.append(legitimateButton);
+  const phishingButton = createButton("pg-phishing", "Report as Phishing");
+  phishingButton.onclick = () => submitFeedback("phishing");
+  feedback.append(phishingButton, legitimateButton);
 
   const feedbackStatus = document.createElement("div");
   feedbackStatus.id = "pg-feedback-status";
@@ -83,14 +85,17 @@ function showLegitimateNotification(data) {
   body.append(createTextElement("strong", "OPTIMUS"));
   body.append(createTextElement("span", "Website appears legitimate"));
   body.append(createTextElement("span", `${data.confidence}% confidence`));
+  body.append(createTextElement("small", "Model estimate only; this is not a safety guarantee."));
 
   const phishingButton = createButton("pg-phishing", "Report as Phishing");
   phishingButton.onclick = () => submitFeedback("phishing");
+  const legitimateButton = createButton("pg-legitimate", "Report as Legitimate");
+  legitimateButton.onclick = () => submitFeedback("legitimate");
 
   const status = document.createElement("small");
   status.id = "pg-legit-status";
 
-  body.append(phishingButton, status);
+  body.append(phishingButton, legitimateButton, status);
   notification.append(body);
 
   const style = createStyle();
@@ -104,6 +109,9 @@ function showLegitimateNotification(data) {
 
 function submitFeedback(actualLabel) {
   if (!currentPredictionId) return;
+  const buttons = document.querySelectorAll("#pg-legitimate, #pg-phishing");
+  if ([...buttons].some(button => button.disabled)) return;
+  buttons.forEach(button => button.disabled = true);
 
   chrome.runtime.sendMessage({
     action: "feedback",
@@ -115,18 +123,18 @@ function submitFeedback(actualLabel) {
 
     if (chrome.runtime.lastError) {
       if (status) status.textContent = "Feedback error.";
+      buttons.forEach(button => button.disabled = false);
       return;
     }
 
     if (!response || !response.success) {
       if (status) status.textContent = response?.error || "Could not save feedback.";
+      buttons.forEach(button => button.disabled = false);
       return;
     }
 
     if (status) status.textContent = "Feedback recorded";
-    document.querySelectorAll("#pg-legitimate, #pg-phishing").forEach((button) => {
-      button.disabled = true;
-    });
+    // Keep controls disabled after success to prevent repeat submission.
   });
 }
 
