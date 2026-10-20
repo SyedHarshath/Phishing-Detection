@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Privacy information for the OPTIMUS browser extension.">
+  <title>OPTIMUS Privacy Policy</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #4b5568;
+      --line: #d8deea;
+      --paper: #ffffff;
+      --canvas: #f3f6fb;
+      --accent: #124b8a;
+      --notice: #fff2d4;
+      --notice-border: #a95d00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font: 1rem/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(100% - 2rem, 52rem);
+      margin: 2.5rem auto;
+      padding: clamp(1.25rem, 5vw, 3rem);
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      box-shadow: 0 0.5rem 2rem rgb(20 40 70 / 7%);
+    }
+    h1, h2 { line-height: 1.25; }
+    h1 { margin-top: 0; font-size: clamp(2rem, 6vw, 2.7rem); }
+    h2 { margin-top: 2rem; font-size: 1.3rem; }
+    p, li { max-width: 72ch; }
+    a { color: var(--accent); }
+    .muted { color: var(--muted); }
+    .notice {
+      margin: 1.5rem 0;
+      padding: 1rem 1.2rem;
+      border: 2px solid var(--notice-border);
+      border-radius: 0.6rem;
+      background: var(--notice);
+    }
+    .notice strong { display: block; margin-bottom: 0.25rem; }
+    .details { padding-left: 1.25rem; }
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); }
+    @media (prefers-reduced-motion: no-preference) {
+      html { scroll-behavior: smooth; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="muted">OPTIMUS browser extension</p>
+      <h1>Privacy Policy</h1>
+      <p><strong>Effective date:</strong> Not set</p>
+    </header>
+
+    <aside class="notice" role="note" aria-label="Publication status">
+      <strong>Publication draft — not final</strong>
+      This page describes the behavior confirmed in the project code, but it is not ready to publish. The service operator, contact address, retention and deletion process, and several details of the live hosting setup still need confirmation. Resolve the items in “Before publication” before presenting this as the final policy.
+    </aside>
+
+    <p>This policy is intended for the OPTIMUS extension release configured to use the API at <code>https://optimus-eewm.onrender.com</code>. A different extension build may send information to a different API. Check the extension’s data notice and the API address in the installed release.</p>
+
+    <h2>What OPTIMUS does</h2>
+    <p>OPTIMUS classifies a submitted web address as phishing or legitimate and displays the model’s confidence estimate. The service processes the URL text; the extension’s prediction request does not ask the destination website to provide its page contents.</p>
+
+    <h2>When a URL is sent</h2>
+    <p>The extension asks for affirmative consent before scanning. After you enable scanning, it automatically sends the full URL for qualifying HTTP or HTTPS page navigations to the API. The URL can include the domain, path, query parameters, and fragment. These parts can contain personal information, search terms, account identifiers, or secret values. Do not scan a private page or a URL containing credentials or other information you do not want sent to the service.</p>
+    <p>Automatic scanning excludes the following hostnames and their subdomains: <code>google.com</code>, <code>google.co.in</code>, <code>bing.com</code>, <code>yahoo.com</code>, <code>duckduckgo.com</code>, <code>ecosia.org</code>, <code>search.brave.com</code>, <code>yandex.com</code>, and <code>baidu.com</code>. A manual scan from the popup sends the HTTP or HTTPS URL shown or entered there; the automatic-scan exclusion list does not restrict that manual scan.</p>
+    <p>The extension also contacts the configured API’s health endpoint to show whether the service and model are available. It sends prediction requests to <code>/predict</code> and feedback requests to <code>/feedback</code>.</p>
+
+    <h2>Information the service stores</h2>
+    <p>When a prediction succeeds, the application stores the submitted URL, prediction time, predicted class, confidence score, and model version in a SQLite database. A URL may reveal sensitive information even when the website itself is public.</p>
+    <p>If you submit feedback, the application stores the label you selected and its timestamp with the prediction. It also records feedback and review history, including the label claim, review status, reviewer and provenance information when a review occurs, and any recorded reason. Submitting feedback is only a user claim: it does not by itself verify the label or make the record eligible for training. A reviewer must separately verify it before it can be considered for a training batch.</p>
+    <p>The application code does not define collection of account profiles or payment details. The hosting platform or network infrastructure may process technical request information, such as information needed to deliver and operate the service; the exact logs and fields retained by the live deployment have not been confirmed.</p>
+
+    <h2>Why information is used</h2>
+    <p>URLs are used to return a phishing-detection result. Feedback may be reviewed to assess the reported label. Only separately reviewed, verified, provenance-bearing feedback can become eligible for a training batch under the project’s safeguards. A user report is not automatically used to train or replace the active model.</p>
+
+    <h2>Where information goes and who may access it</h2>
+    <p>The extension sends requests to the API origin configured in that extension build. For the release described here, the configured origin is the Render-hosted address shown above. The API service and its hosting infrastructure process these requests to provide the service. The project code does not show analytics or advertising integrations or another URL-sharing destination.</p>
+    <p>The application stores prediction and feedback records in SQLite. People with access to the service’s database or hosting environment may be able to access those records. Authorized reviewers may inspect URLs associated with feedback when reviewing a label. The prediction and feedback API routes do not require a user account. The separate prediction-history route is disabled unless an operator configures a shared access token; when enabled, it omits URLs by default but can return them when an authorized caller explicitly requests them.</p>
+    <p>The application does not encrypt its SQLite database itself. Whether the current hosting storage is encrypted at rest, who at the hosting provider can access service data, what request and application logs are retained, and whether backups contain these records have not been confirmed. This policy does not make a promise about those unverified controls.</p>
+
+    <h2>Retention and deletion</h2>
+    <p>The application has no automatic retention period or user-facing deletion feature. Disabling scanning stops future extension requests from that browser profile, but does not delete records already stored by the service. The project does not currently define a supported process or timeframe for handling an individual deletion request. Records may therefore remain in the database unless the service operator removes them; the handling of backups and hosting logs is also unconfirmed.</p>
+
+    <h2>Your choice</h2>
+    <p>You can decline consent or disable scanning in the extension popup. Revoking consent removes the extension’s saved consent setting and prevents later automatic scans, manual scans, and feedback requests from that browser profile until consent is given again. It does not recall a request already sent or erase server-side records.</p>
+
+    <h2>Model results</h2>
+    <p>A prediction and its confidence are model estimates, not guarantees. Do not rely on OPTIMUS as the only basis for deciding whether a website is safe.</p>
+
+    <h2>Before publication</h2>
+    <p>The following information must be confirmed and this page updated before it is published as the final policy:</p>
+    <ul class="details">
+      <li>Who is the responsible operator: your full legal name, organization name, or other identity that should appear in the policy?</li>
+      <li>What public contact email should users use for privacy questions and data requests?</li>
+      <li>What retention period will apply to prediction records, feedback, review audit records, database backups, and hosting or application logs?</li>
+      <li>How will deletion requests be received, verified, and completed, including deletion from backups, and what timeframe can you actually meet?</li>
+      <li>What Render service plan, region, persistent-storage setup, backup process, and current at-rest encryption settings are configured for this API?</li>
+      <li>What request, application, and platform logs are enabled, which URL or request details do they contain, and how long are those logs retained?</li>
+      <li>Who can access the production database and backups, and is the shared-token prediction-history route enabled on the live service?</li>
+      <li>Which Render subprocessors or other service providers handle user data for this deployment, and what data do they receive?</li>
+      <li>Where will this policy be hosted, and what effective date should it display?</li>
+      <li>Which countries or regions will the extension be offered in, and has the policy been reviewed for those users and applicable legal requirements?</li>
+    </ul>
+    <p>Do not publish this page as final until the answers above are confirmed, the statements are updated to match them, and the published page is reachable over HTTPS.</p>
+
+    <footer>
+      <p>OPTIMUS privacy policy draft. No public policy URL or effective date has been established in this file.</p>
+    </footer>
+  </main>
+</body>
+</html>
