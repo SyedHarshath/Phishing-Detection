@@ -49,6 +49,21 @@ class CompatRow:
         return self._names
 
 
+def _postgres_compat_row_factory(cursor):
+    """Build sqlite.Row-like results, including for commands without rows.
+
+    Psycopg asks for a row-maker even when a statement has no result set. In
+    that case ``cursor.description`` is ``None``; return a valid tuple maker
+    rather than trying to inspect absent column metadata.
+    """
+    description = cursor.description
+    if description is None:
+        return lambda values: tuple(values)
+
+    names = [column.name for column in description]
+    return lambda values: CompatRow(names, values)
+
+
 class ConnectionAdapter:
     def __init__(self, raw, postgres: bool):
         self.raw = raw
@@ -93,13 +108,9 @@ def connect_database(target: str | Path, *, readonly: bool = False):
         except ImportError as exc:
             raise RuntimeError("PostgreSQL is configured but the psycopg driver is not installed") from exc
 
-        def row_factory(cursor):
-            names = [column.name for column in cursor.description]
-            return lambda values: CompatRow(names, values)
-
         raw = psycopg.connect(
             normalize_postgres_url(str(target)),
-            row_factory=row_factory,
+            row_factory=_postgres_compat_row_factory,
             connect_timeout=10,
         )
         conn = ConnectionAdapter(raw, True)
