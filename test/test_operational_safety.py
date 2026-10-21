@@ -15,14 +15,26 @@ from backend.app.services.prediction import ModelUnavailableError, PredictionSer
 
 class OperationalSafetyTests(unittest.TestCase):
     def test_liveness_and_readiness_are_distinct(self):
-        with patch.object(prediction_service, "is_model_loaded", return_value=False):
-            client = TestClient(app)
-            self.assertEqual(client.get("/live").status_code, 200)
-            self.assertEqual(client.get("/ready").status_code, 503)
-        with patch.object(prediction_service, "is_model_loaded", return_value=True):
-            ready = TestClient(app).get("/ready")
+        from backend.app import database
+        with tempfile.TemporaryDirectory() as temp:
+            with patch.object(database, "DB_URL", None), \
+                 patch.object(database, "DB_PATH", Path(temp) / "readiness.sqlite"):
+                database.initialize_database()
+                with patch.object(prediction_service, "is_model_loaded", return_value=False):
+                    client = TestClient(app)
+                    self.assertEqual(client.get("/live").status_code, 200)
+                    self.assertEqual(client.get("/ready").status_code, 503)
+                with patch.object(prediction_service, "is_model_loaded", return_value=True):
+                    ready = TestClient(app).get("/ready")
         self.assertEqual(ready.status_code, 200)
         self.assertEqual(ready.json()["status"], "ready")
+
+    def test_readiness_fails_when_database_cannot_be_reached(self):
+        with patch("backend.app.main.check_database_connection", side_effect=OSError("unavailable")), \
+             patch.object(prediction_service, "is_model_loaded", return_value=True):
+            response = TestClient(app).get("/ready")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "Database is unavailable.")
 
     def test_health_and_model_info_do_not_disclose_artifact_paths(self):
         internal_error = r"Tokenizer not found C:\private\model-store\tokenizer.json"
@@ -145,6 +157,7 @@ class OperationalSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with patch.dict(os.environ, {
                 "PHISHGUARD_ENV": "production",
+                "DATABASE_URL": "postgresql://user:password@localhost:5432/testdb",
                 "PHISHGUARD_DATABASE_PATH": str(Path(tmp) / "predictions.sqlite"),
                 "PHISHGUARD_MODEL_PATH": str(Path(tmp) / "model.h5"),
                 "PHISHGUARD_TOKENIZER_PATH": str(Path(tmp) / "tokenizer.json"),
@@ -155,12 +168,13 @@ class OperationalSafetyTests(unittest.TestCase):
                 self.assertEqual(settings.environment, "production")
             with patch.dict(os.environ, {
                 "PHISHGUARD_ENV": "production",
-                "PHISHGUARD_DATABASE_PATH": "relative/predictions.sqlite",
+                "PHISHGUARD_DATABASE_PATH": str(Path(tmp) / "predictions.sqlite"),
             }, clear=True):
-                with self.assertRaisesRegex(ValueError, "must be absolute"):
+                with self.assertRaisesRegex(ValueError, "requires DATABASE_URL"):
                     get_settings()
             with patch.dict(os.environ, {
                 "PHISHGUARD_ENV": "production",
+                "DATABASE_URL": "postgresql://user:password@localhost:5432/testdb",
                 "PHISHGUARD_DATABASE_PATH": str(Path(tmp) / "predictions.sqlite"),
             }, clear=True):
                 with self.assertRaisesRegex(ValueError, "requires an existing"):

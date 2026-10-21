@@ -5,7 +5,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PHISHGUARD_ENV=production \
-    PHISHGUARD_DATABASE_PATH=/var/lib/phishguard/predictions.db \
     PHISHGUARD_MODEL_PATH=/app/test_results/cnn_bilstm/best_model.h5 \
     PHISHGUARD_TOKENIZER_PATH=/app/ml/artifacts/tokenizer.json \
     PHISHGUARD_MODEL_VERSION=1.0.0
@@ -32,6 +31,7 @@ COPY ml/preprocessing.py ./ml/preprocessing.py
 COPY ml/artifacts/tokenizer.json ./ml/artifacts/tokenizer.json
 COPY mlops/__init__.py ./mlops/__init__.py
 COPY mlops/data/__init__.py ./mlops/data/__init__.py
+COPY mlops/data/connection.py ./mlops/data/connection.py
 COPY mlops/data/lifecycle.py ./mlops/data/lifecycle.py
 COPY src/dl_models.py ./src/dl_models.py
 COPY test_results/cnn_bilstm/best_model.h5 ./test_results/cnn_bilstm/best_model.h5
@@ -44,7 +44,8 @@ RUN useradd --create-home --uid 10001 appuser \
     && chown -R appuser:appuser /app /var/lib/phishguard
 
 # Fail the image build if the API's startup schema migration cannot import.
-RUN python -c "from backend.app.database import initialize_database; from mlops.data.lifecycle import initialize_schema, record_feedback"
+# Import-only check; this build-scoped URL is never used to open a connection.
+RUN DATABASE_URL=postgresql://127.0.0.1/optimus-build-check python -c "from backend.app.database import initialize_database; from mlops.data.lifecycle import initialize_schema, record_feedback"
 
 USER appuser
 

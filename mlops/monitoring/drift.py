@@ -1,7 +1,6 @@
 import csv
 import json
 import math
-import sqlite3
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,25 +8,22 @@ from pathlib import Path
 import mlflow
 
 from mlops.mlflow_config import configure_mlflow
+from mlops.data.connection import connect_database, default_database_target, is_postgres
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = PROJECT_ROOT / "mlops" / "data" / "predictions.db"
+DB_PATH = default_database_target()
 BASELINE_PATH = PROJECT_ROOT / "mlops" / "monitoring" / "reference_data.csv"
 REPORT_PATH = PROJECT_ROOT / "mlops" / "monitoring" / "drift_summary.json"
 
 
 def load_production_rows():
-    if not DB_PATH.exists():
+    if not is_postgres(DB_PATH) and not Path(DB_PATH).is_file():
         return []
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
+    with connect_database(DB_PATH, readonly=True) as conn:
         return conn.execute(
             "SELECT url, prediction, confidence FROM predictions"
         ).fetchall()
-    finally:
-        conn.close()
 
 
 def load_baseline_rows():

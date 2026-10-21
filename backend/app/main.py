@@ -1,18 +1,31 @@
 from contextlib import asynccontextmanager
+import hmac
 import ipaddress
 import os
 import re
 import secrets
+from pathlib import Path
 from urllib.parse import urlsplit
-from fastapi import FastAPI, Header, HTTPException, Query
-from backend.app.config import get_settings
 
+from fastapi import FastAPI, Header, HTTPException, Query
+
+from backend.app.config import get_settings
 from backend.app.database import (
-    initialize_database, add_feedback, get_predictions
+    add_feedback,
+    check_database_connection,
+    get_database_target,
+    get_predictions,
+    initialize_database,
 )
+from mlops.data.connection import connect_database, table_names
 from backend.app.schemas import (
-    PredictionRequest, PredictionResponse, HealthResponse,
-    ModelInfoResponse, FeedbackRequest, FeedbackResponse, PredictionLog
+    FeedbackRequest,
+    FeedbackResponse,
+    HealthResponse,
+    ModelInfoResponse,
+    PredictionLog,
+    PredictionRequest,
+    PredictionResponse,
 )
 from backend.app.services.prediction import ModelUnavailableError, prediction_service
 
@@ -27,6 +40,72 @@ app = FastAPI(
     version="1.1.0",
     lifespan=lifespan,
 )
+
+@app.get("/admin/db-status")
+def database_status(
+    x_optimus_diagnostic_token: str | None = Header(default=None),
+):
+    expected = os.getenv("OPTIMUS_DIAGNOSTIC_TOKEN", "")
+
+    if not expected or not x_optimus_diagnostic_token:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    if not hmac.compare_digest(
+        x_optimus_diagnostic_token, expected
+    ):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    target = get_database_target()
+    if isinstance(target, str) and target.startswith(("postgres://", "postgresql://")):
+        try:
+            with connect_database(target, readonly=True) as conn:
+                tables = table_names(conn)
+                if "predictions" not in tables:
+                    return {"database_backend": "postgresql", "database_exists": True,
+                            "predictions_table_exists": False, "prediction_count": None}
+                count = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+                return {"database_backend": "postgresql", "database_exists": True,
+                        "predictions_table_exists": True, "prediction_count": count}
+        except Exception:
+            raise HTTPException(status_code=503, detail="Database check failed")
+
+    db_path = Path(target)
+
+    if not db_path.is_file():
+        return {
+            "database_exists": False,
+            "prediction_count": None,
+        }
+
+    try:
+        # as_uri() correctly escapes spaces and URI-reserved path characters.
+        with connect_database(db_path, readonly=True) as conn:
+            tables = table_names(conn)
+
+            if "predictions" not in tables:
+                return {
+                    "database_exists": True,
+                    "predictions_table_exists": False,
+                    "prediction_count": None,
+                }
+
+            count = conn.execute(
+                "SELECT COUNT(*) FROM predictions"
+            ).fetchone()[0]
+
+        return {
+            "database_backend": "sqlite",
+            "database_exists": True,
+            "predictions_table_exists": True,
+            "prediction_count": count,
+        }
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Database check failed",
+        )
+
 
 def _valid_hostname(hostname: str) -> bool:
     if not hostname or any(char.isspace() for char in hostname):
@@ -66,7 +145,7 @@ def _is_valid_http_url(url: str) -> bool:
         and parsed.password is None
         and not parsed.netloc.rsplit("@", 1)[-1].endswith(":")
         and _valid_hostname(hostname or "")
-        and (port is None or 0 <= port <= 65535)
+        and (port is None or 1 <= port <= 65535)
     )
 
 def _authorize_predictions(token: str | None) -> None:
@@ -98,6 +177,10 @@ def liveness_check():
 def readiness_check():
     """Serving readiness; hosting health checks should use this route."""
     model_loaded = prediction_service.is_model_loaded()
+    try:
+        check_database_connection()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Database is unavailable.") from exc
     if not model_loaded:
         raise HTTPException(status_code=503, detail="Model is unavailable.")
     return {"status": "ready", "model_loaded": True, "model_error": None}

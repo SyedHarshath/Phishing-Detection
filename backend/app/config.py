@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 @dataclass(frozen=True)
 class Settings:
     environment: str
+    database_url: str | None
     database_path: Path
     predictions_token: str | None
     active_model_manifest: Path
@@ -27,9 +28,15 @@ def get_settings() -> Settings:
     if environment not in {"development", "test", "production"}:
         raise ValueError("PHISHGUARD_ENV must be development, test, or production")
 
+    database_url = os.getenv("DATABASE_URL", "").strip() or None
+    if database_url and not database_url.startswith(("postgres://", "postgresql://")):
+        raise ValueError("DATABASE_URL must use the postgres:// or postgresql:// scheme")
+    if environment == "production" and not database_url:
+        raise ValueError("production requires DATABASE_URL; SQLite is supported for local development and tests")
+
     default_db = PROJECT_ROOT / "mlops" / "data" / "predictions.db"
     database_path = Path(os.getenv("PHISHGUARD_DATABASE_PATH", str(default_db))).expanduser()
-    if environment == "production" and not database_path.is_absolute():
+    if environment == "production" and not database_url and not database_path.is_absolute():
         raise ValueError("PHISHGUARD_DATABASE_PATH must be absolute in production")
 
     model_path_value = os.getenv("PHISHGUARD_MODEL_PATH")
@@ -70,6 +77,7 @@ def get_settings() -> Settings:
 
     return Settings(
         environment=environment,
+        database_url=database_url,
         database_path=database_path,
         predictions_token=os.getenv("PHISHGUARD_PREDICTIONS_TOKEN"),
         active_model_manifest=manifest,

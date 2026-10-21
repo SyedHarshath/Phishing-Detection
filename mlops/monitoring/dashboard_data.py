@@ -1,17 +1,15 @@
 from pathlib import Path
-import sqlite3
 from collections import Counter
+from mlops.data.connection import connect_database, default_database_target, is_postgres
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = PROJECT_ROOT / "mlops" / "data" / "predictions.db"
+DB_PATH = default_database_target()
 
 def load_predictions():
-    if not DB_PATH.exists():
+    if not is_postgres(DB_PATH) and not Path(DB_PATH).is_file():
         return []
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
+    with connect_database(DB_PATH, readonly=True) as conn:
         return conn.execute(
             """
             SELECT id, timestamp, url, prediction, confidence,
@@ -20,8 +18,6 @@ def load_predictions():
             ORDER BY id DESC
             """
         ).fetchall()
-    finally:
-        conn.close()
 
 def print_dashboard():
     rows = load_predictions()
@@ -59,7 +55,7 @@ def print_dashboard():
     for row in rows[:10]:
         print(
             f"#{row['id']} | {row['prediction']:10} | "
-            f"{row['confidence']:6.2f}% | {row['url']}"
+            f"{row['confidence']:6.2f}% | URL hidden"
         )
 
 if __name__ == "__main__":

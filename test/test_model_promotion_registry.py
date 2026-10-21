@@ -218,7 +218,7 @@ class ModelPromotionRegistryTests(unittest.TestCase):
         prediction_service._predictor = None
         prediction_service._load_error = None
         try:
-            with patch.object(database, "DB_PATH", api_db), patch.object(database, "DB_DIR", api_db.parent), \
+            with patch.object(database, "DB_URL", None), patch.object(database, "DB_PATH", api_db), patch.object(database, "DB_DIR", api_db.parent), \
                  patch.dict(os.environ, {"PHISHGUARD_ACTIVE_MODEL_MANIFEST": str(isolated_registry / "active.json")}):
                 with TestClient(app) as client:
                     self.assertEqual(client.get("/health").json()["model_loaded"], True)

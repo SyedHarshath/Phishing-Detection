@@ -12,12 +12,12 @@ This is a scheduled command, not a background daemon. Configure an external sche
 | `RETRAIN_INTERVAL_HOURS` | `PHISHGUARD_REVIEW_INTERVAL_DAYS × 24` (`30` days) | Interval review trigger. |
 | `PHISHGUARD_RETRAINING_COOLDOWN_DAYS` | `7` | Minimum time after a successful job before another is eligible. |
 
-Values can also be supplied as the command's `--min-records`, `--min-per-class`, `--review-days`, and `--cooldown-days` options. A job records its trigger reason, timestamps, batch ID, and stage details in the SQLite lifecycle database. Statuses include `eligible`, `running`, `training_completed`, `evaluating`, `awaiting_approval`, `promoting`, `promoted`, `rejected`, `blocked`, and `failed`. Only verified, provenance-bearing labels enter exported batches; user feedback itself remains an unverified claim. PhishTank or Common Crawl membership is not by itself proof that an individual URL label is valid.
+Values can also be supplied as the command's `--min-records`, `--min-per-class`, `--review-days`, and `--cooldown-days` options. The lifecycle database follows the API database selection: `DATABASE_URL` when configured, otherwise the local SQLite path. A job records its trigger reason, timestamps, batch ID, and stage details. Statuses include `eligible`, `running`, `training_completed`, `evaluating`, `awaiting_approval`, `promoting`, `promoted`, `rejected`, `blocked`, and `failed`. Only verified, provenance-bearing labels enter exported batches; user feedback itself remains an unverified claim. PhishTank or Common Crawl membership is not by itself proof that an individual URL label is valid.
 
 Example (the paths must refer to independently reviewed, real evidence):
 
 ```powershell
-python -m mlops.data.lifecycle --db <database> scheduled-review `
+python -m mlops.data.lifecycle scheduled-review `
   --provenance-manifest <training-source-provenance.json> `
   --evaluation-tsv <independent-evaluation.tsv> `
   --evaluation-manifest <evaluation-manifest.json> `

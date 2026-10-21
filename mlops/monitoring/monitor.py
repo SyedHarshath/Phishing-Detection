@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -12,18 +11,17 @@ if str(PROJECT_ROOT) not in sys.path:
 import mlflow
 
 from mlops.mlflow_config import configure_mlflow
+from mlops.data.connection import connect_database, default_database_target, is_postgres
 
-DB_PATH = PROJECT_ROOT / "mlops" / "data" / "predictions.db"
+DB_PATH = default_database_target()
 REPORT_PATH = PROJECT_ROOT / "mlops" / "monitoring" / "monitoring_run.json"
 
 
 def collect_metrics() -> dict:
-    if not DB_PATH.exists():
+    if not is_postgres(DB_PATH) and not Path(DB_PATH).is_file():
         raise FileNotFoundError(f"Prediction database not found: {DB_PATH}")
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
+    with connect_database(DB_PATH, readonly=True) as conn:
         total = conn.execute("SELECT COUNT(*) AS count FROM predictions").fetchone()["count"]
         phishing = conn.execute(
             "SELECT COUNT(*) AS count FROM predictions WHERE prediction = 'phishing'"
@@ -48,8 +46,6 @@ def collect_metrics() -> dict:
         average_url_length = conn.execute(
             "SELECT AVG(LENGTH(url)) AS avg_length FROM predictions"
         ).fetchone()["avg_length"]
-    finally:
-        conn.close()
 
     phishing_rate = phishing / total if total > 0 else 0.0
     feedback_accuracy = feedback_correct / feedback_count if feedback_count > 0 else 0.0
@@ -92,7 +88,7 @@ def main():
         )
         for name, value in metrics.items():
             mlflow.log_metric(name, float(value))
-        mlflow.log_param("database", str(DB_PATH))
+        mlflow.log_param("database_backend", "postgresql" if is_postgres(DB_PATH) else "sqlite")
         mlflow.log_artifact(str(REPORT_PATH))
 
     print("\nMonitoring run created.")

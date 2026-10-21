@@ -21,6 +21,7 @@
 !mlops/__init__.py
 !mlops/data/
 !mlops/data/__init__.py
+!mlops/data/connection.py
 !mlops/data/lifecycle.py
 !src/
 !src/dl_models.py

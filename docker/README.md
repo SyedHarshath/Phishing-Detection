@@ -7,11 +7,13 @@ authorization to deploy publicly.
 ```text
 Chrome Extension -> host port 8000 -> Docker -> FastAPI -> CNN-BiLSTM
                                                    |
-                                                   -> SQLite volume
+                                                   -> local SQLite volume
 ```
 
-The model is copied into the image. The prediction database is kept in a named
-Docker volume so container recreation does not erase logs.
+This Compose file is for local development and explicitly selects SQLite. The
+prediction database is kept in a named Docker volume so local container
+recreation does not erase demo logs. Production requires a Render PostgreSQL
+DATABASE_URL; follow docs/PRODUCTION_DEPLOYMENT.md for that setup.
 
 ## Required Artifacts
 
@@ -89,6 +91,7 @@ docker build -t optimus-api:readiness -f docker/Dockerfile .
 docker run --rm --name optimus-readiness-test `
   -p 127.0.0.1:18000:8000 `
   --tmpfs /tmp/optimus-readiness-db:rw,noexec,nosuid,size=32m `
+  -e PHISHGUARD_ENV=test `
   -e PHISHGUARD_DATABASE_PATH=/tmp/optimus-readiness-db/predictions.sqlite `
   optimus-api:readiness
 ```

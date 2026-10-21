@@ -9,8 +9,9 @@ Before releasing the image:
 - `/predict` returns prediction, confidence, model version and prediction id.
 - `/feedback` still works.
 - `/predictions` still works.
-- The production host has an approved persistent disk and the absolute `PHISHGUARD_DATABASE_PATH` points inside it.
-- Restarting the container preserves SQLite data on that disk.
+- The Render PostgreSQL database is provisioned and `DATABASE_URL` is configured as a service secret in the same region.
+- `/ready` succeeds with the PostgreSQL connection available, and `/admin/db-status` confirms the `postgresql` backend without returning URL data.
+- A synthetic prediction remains present after an application restart/redeploy.
 - The training dataset is not inside the image.
 - Secrets are not copied into the image.
 - The production extension package contains only the explicitly configured HTTPS API origin and hosted privacy-policy URL.

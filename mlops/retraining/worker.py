@@ -10,7 +10,6 @@ import hashlib
 import json
 import importlib.util
 import os
-import sqlite3
 import sys
 import tempfile
 import uuid
@@ -63,20 +62,14 @@ def _sha(path: Path) -> str:
 
 def _read_only_job(job_id: str, db_path: Path):
     lifecycle.require_schema(db_path)
-    conn = sqlite3.connect(f"file:{db_path.resolve().as_posix()}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    try:
+    with lifecycle.connect(db_path, readonly=True) as conn:
         row = conn.execute("SELECT * FROM retraining_jobs WHERE job_id=?", (job_id,)).fetchone()
-        return dict(row) if row else None
-    finally:
-        conn.close()
+        return dict(zip(row.keys(), row)) if row else None
 
 
 def verify_batch(batch_id: str, db_path: Path, batch_root: Path) -> tuple[dict | None, list[str]]:
     problems = []
-    conn = sqlite3.connect(f"file:{db_path.resolve().as_posix()}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    try:
+    with lifecycle.connect(db_path, readonly=True) as conn:
         row = conn.execute("SELECT * FROM training_batches WHERE batch_id=?", (batch_id,)).fetchone()
         if row is None:
             return None, ["approved_batch_not_found"]
@@ -84,8 +77,6 @@ def verify_batch(batch_id: str, db_path: Path, batch_root: Path) -> tuple[dict |
             p.training_eligible,p.label_provenance FROM training_batch_records b
             JOIN predictions p ON p.id=b.prediction_id WHERE b.batch_id=? ORDER BY p.id""", (batch_id,)).fetchall()
         ids = [r["id"] for r in source_rows]
-    finally:
-        conn.close()
     directory = batch_root / batch_id
     manifest_path, data_path = directory / "manifest.json", directory / "train.tsv"
     try:
@@ -444,7 +435,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("job_id")
     parser.add_argument("--execute", action="store_true", help="claim job and train an isolated candidate")
-    parser.add_argument("--db", type=Path, default=lifecycle.DEFAULT_DB)
+    parser.add_argument("--db", default=lifecycle.DEFAULT_DB,
+                        help="SQLite file path or PostgreSQL URL (default follows DATABASE_URL)")
     parser.add_argument("--batch-root", type=Path, default=lifecycle.DEFAULT_BATCH_DIR)
     parser.add_argument("--dataset", type=Path, default=ROOT / "dataset" / "big_dataset")
     parser.add_argument("--validation-report", type=Path, default=ROOT / "mlops" / "dvc" / "validation_report.json")

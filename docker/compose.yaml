@@ -6,6 +6,10 @@ services:
     image: phishguard-api:1.0.0
     container_name: phishguard-api
     restart: unless-stopped
+    environment:
+      # Compose is a local-development stack. Production requires DATABASE_URL.
+      PHISHGUARD_ENV: development
+      PHISHGUARD_DATABASE_PATH: /var/lib/phishguard/predictions.db
     ports:
       # Prediction and feedback are unauthenticated; /predictions contains full URLs.
       # Keep the published service available only on this host by default.

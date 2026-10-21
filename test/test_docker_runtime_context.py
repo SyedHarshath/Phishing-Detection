@@ -20,6 +20,7 @@ RUNTIME_MODULES = (
     "ml/preprocessing.py",
     "mlops/__init__.py",
     "mlops/data/__init__.py",
+    "mlops/data/connection.py",
     "mlops/data/lifecycle.py",
     "src/dl_models.py",
 )
@@ -41,8 +42,9 @@ class DockerRuntimeContextTests(unittest.TestCase):
         self.assertNotIn("COPY ml/artifacts/best_model.h5", dockerfile)
         self.assertIn("!mlops/data/lifecycle.py", dockerignore)
         self.assertNotIn("!ml/**", dockerignore)
-        self.assertIn("PHISHGUARD_DATABASE_PATH=/var/lib/phishguard/predictions.db", dockerfile)
         compose = (ROOT / "docker/compose.yaml").read_text(encoding="utf-8")
+        self.assertIn("PHISHGUARD_DATABASE_PATH: /var/lib/phishguard/predictions.db", compose)
+        self.assertIn("PHISHGUARD_ENV: development", compose)
         self.assertIn("phishguard-data:/var/lib/phishguard", compose)
         self.assertNotIn("/app/mlops/data", compose)
 
@@ -61,6 +63,7 @@ class DockerRuntimeContextTests(unittest.TestCase):
                 "initialize_database(); require_schema(DB_PATH); print('runtime import and schema migration ok')"
             )
             env = os.environ.copy()
+            env.pop("DATABASE_URL", None)
             env["PHISHGUARD_ENV"] = "test"
             env["PHISHGUARD_DATABASE_PATH"] = str(Path(temp) / "isolated.sqlite")
             result = subprocess.run([sys.executable, "-c", script], cwd=runtime_root,

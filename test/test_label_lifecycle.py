@@ -54,7 +54,7 @@ class LabelLifecycleTests(unittest.TestCase):
         from unittest.mock import patch
         from backend.app import database
         db = self.root / "backend-interface.db"
-        with patch.object(database, "DB_PATH", db), patch.object(database, "DB_DIR", db.parent):
+        with patch.object(database, "DB_URL", None), patch.object(database, "DB_PATH", db), patch.object(database, "DB_DIR", db.parent):
             database.initialize_database()
             event_id = database.log_prediction("https://fixture.example/", "legitimate", 91.0, "test-v1")
             self.assertTrue(database.add_feedback(event_id, "phishing"))
