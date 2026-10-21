@@ -8,115 +8,117 @@
   <style>
     :root {
       color-scheme: light;
-      --ink: #172033;
-      --muted: #4b5568;
-      --line: #d8deea;
-      --paper: #ffffff;
+      --ink: #182236;
+      --muted: #4e5a70;
+      --line: #dce2ec;
+      --paper: #fff;
       --canvas: #f3f6fb;
       --accent: #124b8a;
-      --notice: #fff2d4;
-      --notice-border: #a95d00;
+      --notice-bg: #fff4d8;
+      --notice-border: #9a5700;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       background: var(--canvas);
       color: var(--ink);
-      font: 1rem/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+      font: 1rem/1.7 system-ui, -apple-system, "Segoe UI", sans-serif;
     }
     main {
-      width: min(100% - 2rem, 52rem);
-      margin: 2.5rem auto;
-      padding: clamp(1.25rem, 5vw, 3rem);
+      width: min(100% - 2rem, 54rem);
+      margin: clamp(1rem, 5vw, 3rem) auto;
+      padding: clamp(1.25rem, 5vw, 3.25rem);
       background: var(--paper);
       border: 1px solid var(--line);
       border-radius: 1rem;
       box-shadow: 0 0.5rem 2rem rgb(20 40 70 / 7%);
     }
     h1, h2 { line-height: 1.25; }
-    h1 { margin-top: 0; font-size: clamp(2rem, 6vw, 2.7rem); }
-    h2 { margin-top: 2rem; font-size: 1.3rem; }
-    p, li { max-width: 72ch; }
+    h1 { margin: 0.25rem 0; font-size: clamp(2rem, 6vw, 2.8rem); }
+    h2 { margin: 2.25rem 0 0.65rem; font-size: 1.3rem; }
+    p, li { max-width: 74ch; }
     a { color: var(--accent); }
-    .muted { color: var(--muted); }
+    code, .email-placeholder { overflow-wrap: anywhere; }
+    .eyebrow, .muted { color: var(--muted); }
+    .eyebrow { margin: 0; font-weight: 650; letter-spacing: 0.04em; }
     .notice {
       margin: 1.5rem 0;
       padding: 1rem 1.2rem;
       border: 2px solid var(--notice-border);
-      border-radius: 0.6rem;
-      background: var(--notice);
+      border-radius: 0.65rem;
+      background: var(--notice-bg);
     }
-    .notice strong { display: block; margin-bottom: 0.25rem; }
-    .details { padding-left: 1.25rem; }
-    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); }
-    @media (prefers-reduced-motion: no-preference) {
-      html { scroll-behavior: smooth; }
+    .notice strong { display: block; margin-bottom: 0.2rem; }
+    .operator-list { padding-left: 1.25rem; }
+    .operator-list li { margin: 0.4rem 0; }
+    .email-placeholder { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    @media (max-width: 36rem) {
+      main { width: 100%; margin: 0; padding: 1.25rem 1rem 2rem; border: 0; border-radius: 0; }
+      h2 { margin-top: 1.8rem; }
     }
   </style>
 </head>
 <body>
   <main>
     <header>
-      <p class="muted">OPTIMUS browser extension</p>
+      <p class="eyebrow">OPTIMUS browser extension</p>
       <h1>Privacy Policy</h1>
-      <p><strong>Effective date:</strong> Not set</p>
+      <p class="muted"><strong>Effective date:</strong> <time datetime="2026-10-28">28 October 2026</time></p>
     </header>
 
-    <aside class="notice" role="note" aria-label="Publication status">
-      <strong>Publication draft — not final</strong>
-      This page describes the behavior confirmed in the project code, but it is not ready to publish. The service operator, contact address, retention and deletion process, and several details of the live hosting setup still need confirmation. Resolve the items in “Before publication” before presenting this as the final policy.
+    <aside class="notice" role="note" aria-label="Policy publication status">
+      <strong>Operational details still need confirmation before inviting real users.</strong>
+      The application has no automatic retention period or user-facing deletion feature. Exact live hosting, storage, backup, and log settings have not been verified. The policy does not promise controls or deletion outcomes that the operators have not confirmed.
     </aside>
 
-    <p>This policy is intended for the OPTIMUS extension release configured to use the API at <code>https://optimus-eewm.onrender.com</code>. A different extension build may send information to a different API. Check the extension’s data notice and the API address in the installed release.</p>
+    <p>This policy describes the OPTIMUS release configured to use <code>https://optimus-eewm.onrender.com</code>. Extension builds can be configured for different API addresses, so check the address configured in the copy you install.</p>
+
+    <h2>Who operates OPTIMUS and how to contact us</h2>
+    <p>The OPTIMUS operators are:</p>
+    <ul class="operator-list">
+      <li><strong>Syed Harshath</strong> - <a href="mailto:harshath141105@gmail.com">harshath141105@gmail.com</a></li>
+      <li><strong>Balamurugan</strong> - <a href="mailto:bala07sathy@gmail.com">bala07sathy@gmail.com</a></li>
+    </ul>
+    <p>Contact either operator at the email address shown above with privacy questions or a request to delete information associated with your use of OPTIMUS.</p>
 
     <h2>What OPTIMUS does</h2>
-    <p>OPTIMUS classifies a submitted web address as phishing or legitimate and displays the model’s confidence estimate. The service processes the URL text; the extension’s prediction request does not ask the destination website to provide its page contents.</p>
+    <p>OPTIMUS processes a submitted web address to estimate whether it is phishing or legitimate and returns a confidence score. The prediction request processes the URL text; the application code does not fetch the destination page for its prediction.</p>
 
-    <h2>When a URL is sent</h2>
-    <p>The extension asks for affirmative consent before scanning. After you enable scanning, it automatically sends the full URL for qualifying HTTP or HTTPS page navigations to the API. The URL can include the domain, path, query parameters, and fragment. These parts can contain personal information, search terms, account identifiers, or secret values. Do not scan a private page or a URL containing credentials or other information you do not want sent to the service.</p>
-    <p>Automatic scanning excludes the following hostnames and their subdomains: <code>google.com</code>, <code>google.co.in</code>, <code>bing.com</code>, <code>yahoo.com</code>, <code>duckduckgo.com</code>, <code>ecosia.org</code>, <code>search.brave.com</code>, <code>yandex.com</code>, and <code>baidu.com</code>. A manual scan from the popup sends the HTTP or HTTPS URL shown or entered there; the automatic-scan exclusion list does not restrict that manual scan.</p>
-    <p>The extension also contacts the configured API’s health endpoint to show whether the service and model are available. It sends prediction requests to <code>/predict</code> and feedback requests to <code>/feedback</code>.</p>
+    <h2>When and what the extension sends</h2>
+    <p>The extension requires you to accept its data notice before scanning. After consent, it automatically sends the full URL for qualifying HTTP or HTTPS page navigations to <code>https://optimus-eewm.onrender.com</code> for prediction. A URL can include its scheme, domain, path, query parameters, and fragment. Any of those parts may contain personal information, private search terms, account identifiers, or secret values. Avoid scanning private pages or URLs containing information you do not want sent to the service.</p>
+    <p>Automatic scanning excludes these hostnames and their subdomains: <code>google.com</code>, <code>google.co.in</code>, <code>bing.com</code>, <code>yahoo.com</code>, <code>duckduckgo.com</code>, <code>ecosia.org</code>, <code>search.brave.com</code>, <code>yandex.com</code>, and <code>baidu.com</code>. A manual scan in the popup sends the HTTP or HTTPS URL displayed or entered there; the automatic-scan exclusions do not restrict manual scans.</p>
+    <p>The extension also checks the API health endpoint to display service and model status. It sends prediction requests to <code>/predict</code>. If you submit feedback on a prediction, the extension sends its prediction ID and the label you selected to <code>/feedback</code>.</p>
 
-    <h2>Information the service stores</h2>
-    <p>When a prediction succeeds, the application stores the submitted URL, prediction time, predicted class, confidence score, and model version in a SQLite database. A URL may reveal sensitive information even when the website itself is public.</p>
-    <p>If you submit feedback, the application stores the label you selected and its timestamp with the prediction. It also records feedback and review history, including the label claim, review status, reviewer and provenance information when a review occurs, and any recorded reason. Submitting feedback is only a user claim: it does not by itself verify the label or make the record eligible for training. A reviewer must separately verify it before it can be considered for a training batch.</p>
-    <p>The application code does not define collection of account profiles or payment details. The hosting platform or network infrastructure may process technical request information, such as information needed to deliver and operate the service; the exact logs and fields retained by the live deployment have not been confirmed.</p>
+    <h2>Information stored and why it is used</h2>
+    <p>After a successful prediction, the application stores the full submitted URL, timestamp, predicted class, confidence score, and model version in a SQLite database. The URL is used to provide the prediction. Stored predictions may also be considered during later, separately controlled model improvement.</p>
+    <p>If you submit feedback, the application stores the label you selected and feedback timestamp with the prediction. It also records feedback and review history, including the claimed label, review status, and reviewer, provenance, and reason details when a review is recorded. User feedback is an unverified claim; it is not automatically treated as a correct label or used for training. A reviewer must separately verify a label and record provenance before it may become eligible for a training batch under the project's safeguards.</p>
+    <p>The extension code contains no advertising or analytics integration. The application code does not specify collection of account profiles or payment details. Hosting or network systems may process technical request information needed to provide the service; the exact information in the live service logs has not been confirmed.</p>
 
-    <h2>Why information is used</h2>
-    <p>URLs are used to return a phishing-detection result. Feedback may be reviewed to assess the reported label. Only separately reviewed, verified, provenance-bearing feedback can become eligible for a training batch under the project’s safeguards. A user report is not automatically used to train or replace the active model.</p>
+    <h2>Hosting, access, and sharing</h2>
+    <p>The configured API address is <code>optimus-eewm.onrender.com</code>, under Render's hosting domain. The API service and Render's hosting infrastructure process requests sent there to provide OPTIMUS. The project code does not show another URL-sharing destination. The operators have not confirmed the live service plan, region, storage arrangement, backups, infrastructure logging, provider access, or any other data processors for this deployment.</p>
+    <p>The prediction and feedback endpoints do not require a user account or login. People with access to the service environment or its SQLite database may be able to access stored records. Authorized feedback reviewers may inspect URLs associated with feedback to review labels. The separate prediction-history endpoint is disabled unless an operator configures a shared access token. If enabled, it omits URLs by default, but an authorized caller can explicitly request them. Whether that token is configured on the live service has not been confirmed.</p>
+    <p>The application does not encrypt its SQLite database itself. This statement does not establish whether the hosting provider encrypts storage. The live storage encryption settings and provider controls have not been verified. We do not know what request details may appear in hosting or application logs, who can access those logs, or how long they are retained.</p>
 
-    <h2>Where information goes and who may access it</h2>
-    <p>The extension sends requests to the API origin configured in that extension build. For the release described here, the configured origin is the Render-hosted address shown above. The API service and its hosting infrastructure process these requests to provide the service. The project code does not show analytics or advertising integrations or another URL-sharing destination.</p>
-    <p>The application stores prediction and feedback records in SQLite. People with access to the service’s database or hosting environment may be able to access those records. Authorized reviewers may inspect URLs associated with feedback when reviewing a label. The prediction and feedback API routes do not require a user account. The separate prediction-history route is disabled unless an operator configures a shared access token; when enabled, it omits URLs by default but can return them when an authorized caller explicitly requests them.</p>
-    <p>The application does not encrypt its SQLite database itself. Whether the current hosting storage is encrypted at rest, who at the hosting provider can access service data, what request and application logs are retained, and whether backups contain these records have not been confirmed. This policy does not make a promise about those unverified controls.</p>
+    <h2>Retention and deletion requests</h2>
+    <p>The application currently has no automatic retention period and no user-facing deletion feature. It does not define an automatic schedule for deleting prediction or feedback records. Disabling the extension stops future scans and feedback requests from that browser profile, but it does not delete records already stored by the service.</p>
+    <p>You may request deletion by emailing either operator at the address listed above. Requests will be reviewed and handled manually. Where possible, include the prediction ID if you have it, rather than sending the sensitive URL again; the ID may help locate the associated record. Do not include a full URL unless an operator explains that it is needed to identify the record.</p>
+    <p>This is a manual request process, not an automated deletion feature. No completion timeframe is promised. The application does not confirm deletion from hosting logs or backups, and those systems' retention and deletion practices have not been verified. Until the operators confirm a deletion procedure and how it applies to copies, do not assume that a request removes every copy of information.</p>
 
-    <h2>Retention and deletion</h2>
-    <p>The application has no automatic retention period or user-facing deletion feature. Disabling scanning stops future extension requests from that browser profile, but does not delete records already stored by the service. The project does not currently define a supported process or timeframe for handling an individual deletion request. Records may therefore remain in the database unless the service operator removes them; the handling of backups and hosting logs is also unconfirmed.</p>
+    <h2>Withdrawing consent</h2>
+    <p>You can decline consent or disable scanning in the extension popup. The extension stores the accepted consent version and acceptance time locally in the browser profile. Revoking consent removes those saved consent values and prevents later automatic scans, manual scans, and feedback requests from that profile until you consent again. It does not cancel a request already sent or remove information already stored by the service.</p>
 
-    <h2>Your choice</h2>
-    <p>You can decline consent or disable scanning in the extension popup. Revoking consent removes the extension’s saved consent setting and prevents later automatic scans, manual scans, and feedback requests from that browser profile until consent is given again. It does not recall a request already sent or erase server-side records.</p>
-
-    <h2>Model results</h2>
-    <p>A prediction and its confidence are model estimates, not guarantees. Do not rely on OPTIMUS as the only basis for deciding whether a website is safe.</p>
-
-    <h2>Before publication</h2>
-    <p>The following information must be confirmed and this page updated before it is published as the final policy:</p>
-    <ul class="details">
-      <li>Who is the responsible operator: your full legal name, organization name, or other identity that should appear in the policy?</li>
-      <li>What public contact email should users use for privacy questions and data requests?</li>
-      <li>What retention period will apply to prediction records, feedback, review audit records, database backups, and hosting or application logs?</li>
-      <li>How will deletion requests be received, verified, and completed, including deletion from backups, and what timeframe can you actually meet?</li>
-      <li>What Render service plan, region, persistent-storage setup, backup process, and current at-rest encryption settings are configured for this API?</li>
-      <li>What request, application, and platform logs are enabled, which URL or request details do they contain, and how long are those logs retained?</li>
-      <li>Who can access the production database and backups, and is the shared-token prediction-history route enabled on the live service?</li>
-      <li>Which Render subprocessors or other service providers handle user data for this deployment, and what data do they receive?</li>
-      <li>Where will this policy be hosted, and what effective date should it display?</li>
-      <li>Which countries or regions will the extension be offered in, and has the policy been reviewed for those users and applicable legal requirements?</li>
-    </ul>
-    <p>Do not publish this page as final until the answers above are confirmed, the statements are updated to match them, and the published page is reachable over HTTPS.</p>
+    <h2>Prediction limitations</h2>
+    <p>A prediction and confidence score are model estimates, not guarantees that a website is safe or harmful. Do not rely on OPTIMUS as the only basis for deciding whether to visit a website or enter information.</p>
 
     <footer>
-      <p>OPTIMUS privacy policy draft. No public policy URL or effective date has been established in this file.</p>
+      <p>The contact addresses and effective date are supplied by the operators. Before inviting real users, the operators should verify that these contact channels work and confirm the live hosting, access, logging, backup, retention, and manual deletion details described above. If the policy is published on a date other than 28 October 2026, update the effective date.</p>
     </footer>
   </main>
 </body>
