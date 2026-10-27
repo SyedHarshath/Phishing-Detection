@@ -1,0 +1,195 @@
+name: OPTIMUS Kaggle GPU Retraining
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Disabled by default via ENABLE_SCHEDULED_RETRAIN=false.
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: optimus-kaggle-retraining
+  cancel-in-progress: false
+
+jobs:
+  retrain:
+    # Manual runs are allowed at any time.
+    # Scheduled runs require ENABLE_SCHEDULED_RETRAIN=true.
+    if: ${{ github.event_name != 'schedule' || vars.ENABLE_SCHEDULED_RETRAIN == 'true' }}
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+
+      KAGGLE_DATASET_SLUG: ${{ vars.KAGGLE_DATASET_SLUG }}
+      KAGGLE_KERNEL_SLUG: ${{ vars.KAGGLE_KERNEL_SLUG || 'optimus-retrain' }}
+      KAGGLE_ACCELERATOR: ${{ vars.KAGGLE_ACCELERATOR || 'NvidiaTeslaT4' }}
+
+      KAGGLE_WAIT_TIMEOUT_MINUTES: "240"
+      KAGGLE_POLL_INTERVAL_SECONDS: "45"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate required configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          [[ -n "$KAGGLE_USERNAME" ]] || {
+            echo "Missing Actions secret KAGGLE_USERNAME."
+            exit 1
+          }
+
+          [[ -n "$KAGGLE_KEY" ]] || {
+            echo "Missing Actions secret KAGGLE_KEY."
+            exit 1
+          }
+
+          [[ -n "$KAGGLE_DATASET_SLUG" ]] || {
+            echo "Missing Actions variable KAGGLE_DATASET_SLUG (owner/dataset-slug)."
+            exit 1
+          }
+
+          [[ "$KAGGLE_DATASET_SLUG" == */* ]] || {
+            echo "KAGGLE_DATASET_SLUG must use owner/dataset-slug format."
+            exit 1
+          }
+
+          [[ -n "$KAGGLE_KERNEL_SLUG" ]] || {
+            echo "KAGGLE_KERNEL_SLUG cannot be empty."
+            exit 1
+          }
+
+          echo "Required configuration is present. Secret values will not be printed."
+
+      - name: Install Kaggle CLI
+        run: python -m pip install --upgrade kaggle
+
+      - name: Configure Kaggle credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          folder = Path.home() / ".kaggle"
+          folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+          try:
+              folder.chmod(0o700)
+          except OSError:
+              pass
+
+          credential = {
+              "username": os.environ["KAGGLE_USERNAME"],
+              "key": os.environ["KAGGLE_KEY"],
+          }
+
+          path = folder / "kaggle.json"
+          path.write_text(json.dumps(credential), encoding="utf-8")
+
+          try:
+              path.chmod(0o600)
+          except OSError:
+              pass
+
+          print("Kaggle credential file created with restricted permissions.")
+          PY
+
+      - name: Validate helper scripts and unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python -m py_compile \
+            scripts/prepare_kaggle_kernel.py \
+            scripts/wait_for_kaggle.py \
+            scripts/validate_candidate.py
+
+          python -m unittest discover \
+            -s tests \
+            -p 'test_optimus_retraining*.py' \
+            -v
+
+      - name: Prepare Kaggle kernel metadata
+        run: python scripts/prepare_kaggle_kernel.py
+
+      - name: Submit training to Kaggle GPU
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export KAGGLE_KERNEL_ID="${KAGGLE_USERNAME}/${KAGGLE_KERNEL_SLUG}"
+
+          echo "Submitting kernel ${KAGGLE_KERNEL_SLUG} to Kaggle."
+          echo "Configured dataset slug: ${KAGGLE_DATASET_SLUG}"
+
+          kaggle kernels push \
+            -p kaggle_kernel \
+            --accelerator "$KAGGLE_ACCELERATOR"
+
+          echo "KAGGLE_KERNEL_ID=${KAGGLE_KERNEL_ID}" >> "$GITHUB_ENV"
+
+      - name: Wait for Kaggle training completion
+        run: |
+          python scripts/wait_for_kaggle.py \
+            "$KAGGLE_USERNAME/$KAGGLE_KERNEL_SLUG"
+
+      - name: Download candidate artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p artifacts/kaggle-output
+
+          kaggle kernels output \
+            "$KAGGLE_USERNAME/$KAGGLE_KERNEL_SLUG" \
+            --path artifacts/kaggle-output \
+            --force
+
+          echo "Downloaded filenames (no file contents):"
+          find artifacts/kaggle-output \
+            -type f \
+            -printf '%P (%s bytes)\n' | sort
+
+      - name: Validate candidate artifact structure
+        run: |
+          python scripts/validate_candidate.py \
+            --candidate-dir artifacts/kaggle-output
+
+      - name: Write workflow summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## OPTIMUS Kaggle retraining run"
+            echo ""
+            echo "- Trigger: ${GITHUB_EVENT_NAME}"
+            echo "- Kernel: ${KAGGLE_USERNAME}/${KAGGLE_KERNEL_SLUG}"
+            echo "- Candidate artifact validation must pass before the output is considered usable."
+            echo "- This workflow does not promote or deploy the candidate to Render."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload candidate and diagnostic artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optimus-kaggle-candidate-${{ github.run_id }}
+          path: artifacts/kaggle-output/
+          if-no-files-found: warn
+          retention-days: 14
