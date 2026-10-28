@@ -28,6 +28,7 @@ from backend.app.schemas import (
     PredictionResponse,
 )
 from backend.app.services.prediction import ModelUnavailableError, prediction_service
+from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,6 +40,16 @@ app = FastAPI(
     description="Deep Learning based phishing URL detection API",
     version="1.1.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "chrome-extension://pmnjajjldognobpfmnjennmhlglhchfg",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 @app.get("/admin/db-status")
