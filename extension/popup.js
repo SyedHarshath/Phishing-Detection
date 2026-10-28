@@ -11,7 +11,7 @@ const consentCheckbox = document.getElementById("consentCheckbox");
 const enableScanButton = document.getElementById("enableScanButton");
 const disableScanButton = document.getElementById("disableScanButton");
 const consentGrantedNotice = document.getElementById("consentGrantedNotice");
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://optimus-eewm.onrender.com";
 // Keep in sync with background.js; bump when collection scope, destinations,
 // storage, or use changes so existing users must review the updated notice.
 const CONSENT_VERSION = "2026-10-20-nav-url-scope-v2";
@@ -111,7 +111,7 @@ async function scanUrl() {
 async function checkApi() {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 90000);
     let response;
     try {
       response = await fetch(`${API_BASE}/health`, {signal: controller.signal});
@@ -128,9 +128,14 @@ async function checkApi() {
     apiStatus.textContent = data.model_loaded
       ? "API connected - Model loaded"
       : "API connected - Model not loaded";
-  } catch (_) {
-    apiStatus.textContent = "API offline - Start FastAPI on port 8000";
-  }
+  } catch (error) {
+  console.error("OPTIMUS health check failed:", error);
+
+  apiStatus.textContent =
+    error.name === "AbortError"
+      ? "API startup timed out. Please retry."
+      : "Could not reach the production API. Please retry.";
+}
 }
 
 async function enableScanning() {

@@ -17,8 +17,11 @@ function displayResult(data) {
 }
 
 function showPhishingWarning(data) {
-  const overlay = document.createElement("div");
-  overlay.id = "optimus-warning";
+  const notification = document.createElement("div");
+  notification.id = "OPTIMUS-warning";
+  notification.setAttribute("role", "alert");
+  notification.setAttribute("aria-live", "assertive");
+  pinTopRight(notification, 420);
 
   const box = document.createElement("div");
   box.id = "OPTIMUS-box";
@@ -51,7 +54,7 @@ function showPhishingWarning(data) {
 
   const stayButton = createButton("pg-stay", "Stay on Website");
   stayButton.onclick = () => {
-    overlay.remove();
+    notification.remove();
     style.remove();
   };
 
@@ -71,15 +74,16 @@ function showPhishingWarning(data) {
   feedbackStatus.id = "pg-feedback-status";
 
   box.append(icon, heading, message, confidence, model, buttons, feedback, feedbackStatus);
-  overlay.append(box);
+  notification.append(box);
 
   const style = createStyle();
-  document.documentElement.append(style, overlay);
+  document.documentElement.append(style, notification);
 }
 
 function showLegitimateNotification(data) {
   const notification = document.createElement("div");
   notification.id = "OPTIMUS-legitimate";
+  pinTopRight(notification, 360);
 
   const body = document.createElement("div");
   body.append(createTextElement("strong", "OPTIMUS"));
@@ -104,6 +108,7 @@ function showLegitimateNotification(data) {
   notificationTimer = setTimeout(() => {
     notification.remove();
     style.remove();
+    notificationTimer = null;
   }, 5000);
 }
 
@@ -139,10 +144,25 @@ function submitFeedback(actualLabel) {
 }
 
 function removeExistingUI() {
-  if (notificationTimer) clearTimeout(notificationTimer);
-  document.getElementById("OPTIMUS-warning")?.remove();
-  document.getElementById("OPTIMUS-legitimate")?.remove();
-  document.getElementById("OPTIMUS-style")?.remove();
+  if (notificationTimer) {
+    clearTimeout(notificationTimer);
+    notificationTimer = null;
+  }
+  document.querySelectorAll(
+    "#OPTIMUS-warning, #optimus-warning, #OPTIMUS-legitimate, #OPTIMUS-style"
+  ).forEach(element => element.remove());
+}
+
+function pinTopRight(element, width) {
+  element.style.setProperty("position", "fixed", "important");
+  element.style.setProperty("inset", "auto", "important");
+  element.style.setProperty("top", "20px", "important");
+  element.style.setProperty("right", "20px", "important");
+  element.style.setProperty("bottom", "auto", "important");
+  element.style.setProperty("left", "auto", "important");
+  element.style.setProperty("z-index", "2147483647", "important");
+  element.style.setProperty("width", `min(${width}px, calc(100vw - 32px))`, "important");
+  element.style.setProperty("box-sizing", "border-box", "important");
 }
 
 function createTextElement(tagName, text) {
@@ -162,13 +182,15 @@ function createStyle() {
   const style = document.createElement("style");
   style.id = "OPTIMUS-style";
   style.textContent = `
-    #OPTIMUS-warning{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:2147483647;font-family:Arial,sans-serif}
-    #OPTIMUS-box{width:460px;max-width:calc(100vw - 40px);padding:30px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center}
-    .pg-icon{font-size:55px;font-weight:700;color:#b91c1c}.pg-confidence{margin-top:20px;padding:15px;background:#fee2e2;border-radius:10px;display:flex;justify-content:space-between}.pg-confidence strong{color:#b91c1c}
-    #OPTIMUS-box h1{color:#b91c1c}.pg-model{margin-top:12px;font-size:12px;color:#777}.pg-buttons{display:flex;gap:10px;margin-top:25px}.pg-buttons button{flex:1;padding:12px;border:0;border-radius:8px;cursor:pointer;font-weight:bold}
-    #pg-back{background:#b91c1c;color:#fff}#pg-stay{background:#e5e7eb;color:#333}.pg-feedback{margin-top:18px;padding-top:14px;border-top:1px solid #eee;color:#666;font-size:12px}.pg-feedback button,#OPTIMUS-legitimate button{margin-top:8px;padding:8px 12px;border:1px solid #d1d5db;border-radius:7px;background:#fff;cursor:pointer}
+    #OPTIMUS-warning{position:fixed!important;inset:auto!important;top:20px!important;right:20px!important;bottom:auto!important;left:auto!important;width:min(420px,calc(100vw - 32px))!important;z-index:2147483647!important;font-family:Arial,sans-serif;background:#fff;border:1px solid #fecaca;border-left:5px solid #b91c1c;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.24);color:#222}
+    #OPTIMUS-box{padding:16px;text-align:left}
+    .pg-icon{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#fee2e2;color:#b91c1c;font-size:17px;font-weight:700}
+    #OPTIMUS-box h1{margin:8px 0;font-size:18px;color:#b91c1c}#OPTIMUS-box p{margin:6px 0;color:#444;font-size:13px;line-height:1.4}
+    .pg-confidence{margin-top:12px;padding:10px;background:#fff1f2;border-radius:8px;display:flex;justify-content:space-between;gap:10px}.pg-confidence strong{color:#b91c1c}
+    .pg-model{margin-top:8px;font-size:12px;color:#666}.pg-buttons{display:flex;gap:8px;margin-top:12px}.pg-buttons button{flex:1;padding:9px 8px;border:0;border-radius:7px;cursor:pointer;font-weight:600}
+    #pg-back{background:#b91c1c;color:#fff}#pg-stay{background:#e5e7eb;color:#333}.pg-feedback{margin-top:12px;padding-top:10px;border-top:1px solid #eee;color:#666;font-size:12px}.pg-feedback button,#OPTIMUS-legitimate button{margin:6px 5px 0 0;padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;background:#fff;cursor:pointer}
     #pg-feedback-status,#pg-legit-status{display:block;margin-top:8px;color:#15803d;font-size:12px}
-    #OPTIMUS-legitimate{position:fixed;top:20px;right:20px;z-index:2147483647;font-family:Arial,sans-serif;background:#fff;border-radius:10px;box-shadow:0 5px 25px rgba(0,0,0,.2);padding:14px 18px;font-size:13px}
+    #OPTIMUS-legitimate{position:fixed!important;inset:auto!important;top:20px!important;right:20px!important;bottom:auto!important;left:auto!important;width:min(360px,calc(100vw - 32px))!important;box-sizing:border-box;z-index:2147483647!important;font-family:Arial,sans-serif;background:#fff;border-radius:10px;box-shadow:0 5px 25px rgba(0,0,0,.2);padding:14px 18px;font-size:13px}
     #OPTIMUS-legitimate div{display:flex;flex-direction:column;gap:4px}#OPTIMUS-legitimate strong{color:#15803d;font-size:15px}#OPTIMUS-legitimate span{color:#555}
   `;
   return style;

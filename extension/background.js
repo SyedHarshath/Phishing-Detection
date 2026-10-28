@@ -1,4 +1,4 @@
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://optimus-eewm.onrender.com";
 // Bump when collection scope, destinations, storage, or use changes.
 const CONSENT_VERSION = "2026-10-20-nav-url-scope-v2";
 const pendingScans = new Map();
@@ -103,7 +103,7 @@ async function sendFeedback(predictionId, actualLabel) {
 
 async function fetchWithTimeout(url, options) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
+  const timer = setTimeout(() => controller.abort(), 90000);
   try {
     return await fetch(url, {...options, signal: controller.signal});
   } catch (error) {
