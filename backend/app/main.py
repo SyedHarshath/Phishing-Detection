@@ -46,6 +46,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "chrome-extension://pmnjajjldognobpfmnjennmhlglhchfg",
+        "chrome-extension://agmplpgjbfoihjekddgkajmbgkmjfibj"
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
